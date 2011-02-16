@@ -20,115 +20,12 @@ struct aodbm {
     pthread_mutex_t version;
 };
 
-struct aodbm_rope_node {
-    aodbm_data *dat;
-    struct aodbm_rope_node *next;
-};
-
-typedef struct aodbm_rope_node aodbm_rope_node;
-
-struct aodbm_rope {
-    aodbm_rope_node *first;
-    aodbm_rope_node *last;
-};
-
-aodbm_rope_node *aodbm_data_to_rope_node_di(aodbm_data *dat) {
-    aodbm_rope_node *node = malloc(sizeof(aodbm_rope_node));
-    node->dat = aodbm_data_dup(dat);
-    node->next = NULL;
-    return node;
-}
-
-aodbm_rope_node *aodbm_data_to_rope_node(aodbm_data *dat) {
-    return aodbm_data_to_rope_node_di(aodbm_data_dup(dat));
-}
-
-aodbm_rope *aodbm_data_to_rope_di(aodbm_data *dat) {
-    aodbm_rope *result = malloc(sizeof(aodbm_rope));
-    aodbm_rope_node *node = aodbm_data_to_rope_node_di(dat);
-    result->first = node;
-    result->last = node;
-    return result;
-}
-
-aodbm_rope *aodbm_data_to_rope(aodbm_data *dat) {
-    return aodbm_data_to_rope_di(aodbm_data_dup(dat));
-}
-
-aodbm_rope *aodbm_rope_empty() {
-    return aodbm_data_to_rope_di(aodbm_data_empty());
-}
-
-size_t aodbm_rope_size(aodbm_rope *rope) {
-    aodbm_rope_node *it;
-    size_t sz = 0;
-    for (it = rope->first; it != NULL; it = it->next) {
-        sz += it->dat->sz;
-    }
-    return sz;
-}
-
-aodbm_data *aodbm_rope_to_data(aodbm_rope *rope) {
-    size_t sz = aodbm_rope_size(rope);
-    
-    aodbm_data *result = malloc(sizeof(aodbm_data));
-    result->dat = malloc(sz);
-    result->sz = sz;
-    
-    size_t pos = 0;
-    aodbm_rope_node *it;
-    for (it = rope->first; it != NULL; it = it->next) {
-        memcpy(&result->dat[pos], it->dat->dat, it->dat->sz);
-        pos += it->dat->sz;
-    }
-    
-    return result;
-}
-
-void aodbm_free_rope(aodbm_rope *rope) {
-    aodbm_rope_node *it;
-    for (it = rope->first; it != NULL;) {
-        aodbm_free_data(it->dat);
-        aodbm_rope_node *next = it->next;
-        free(it);
-        it = next;
-    }
-    free(rope);
-}
-
-void aodbm_rope_append_di(aodbm_rope *rope, aodbm_data *dat) {
-    aodbm_rope_node *node = aodbm_data_to_rope_node_di(dat);
-    rope->last->next = node;
-    rope->last = node;
-}
-
-void aodbm_rope_prepend_di(aodbm_rope *rope, aodbm_data *dat) {
-    aodbm_rope_node *node = aodbm_data_to_rope_node_di(dat);
-    node->next = rope->first;
-    rope->first = node;
-}
-
-void aodbm_rope_append(aodbm_rope *rope, aodbm_data *dat) {
-    aodbm_rope_append(rope, aodbm_data_dup(dat));
-}
-
-void aodbm_rope_prepend(aodbm_rope *rope, aodbm_data *dat) {
-    aodbm_rope_prepend(rope, aodbm_data_dup(dat));
-}
-
-aodbm_rope *aodbm_rope_merge_di(aodbm_rope *a, aodbm_rope *b) {
-    a->last->next = b->first;
-    a->last = b->last;
-    free(b);
-    return a;
-}
-
 void print_hex(c) {
     printf("\\x%.2x", c);
 }
 
 /* python style string printing */
-void aodbm_print(aodbm_data *dat) {
+void aodbm_print_data(aodbm_data *dat) {
     size_t i;
     for (i = 0; i < dat->sz; ++i) {
         char c = dat->dat[i];
@@ -142,9 +39,21 @@ void aodbm_print(aodbm_data *dat) {
     }
 }
 
-void annotate(const char *name, aodbm_data *val) {
+void annotate_data(const char *name, aodbm_data *val) {
     printf("%s: ", name);
-    aodbm_print(val);
+    aodbm_print_data(val);
+    putchar('\n');
+}
+
+void aodbm_print_rope(aodbm_rope *rope) {
+    aodbm_data *dat = aodbm_rope_to_data(rope);
+    aodbm_print_data(dat);
+    aodbm_free_data(dat);
+}
+
+void annotate_rope(const char *name, aodbm_rope *val) {
+    printf("%s: ", name);
+    aodbm_print_rope(val);
     putchar('\n');
 }
 
@@ -233,7 +142,7 @@ void aodbm_write_version(aodbm *db, uint64_t ver) {
 }
 
 void aodbm_read(aodbm *db, uint64_t off, size_t sz, void *ptr) {
-    /* modify to use mmap */
+    /* TODO: modify to use mmap */
     pthread_mutex_lock(&db->rw);
     fseek(db->fd, off, SEEK_SET);
     if (fread(ptr, 1, sz, db->fd) != sz) {
@@ -297,43 +206,43 @@ aodbm_data *aodbm_read_data(aodbm *db, uint64_t off) {
   node + 5 ... = (key, val)+
 */
 
-aodbm_data *make_block(aodbm_data *dat) {
-    aodbm_data *sz = aodbm_data_from_32(dat->sz);
-    aodbm_data *rec = aodbm_cat_data(sz, dat);
-    aodbm_free_data(sz);
-    return rec;
+aodbm_rope *make_block(aodbm_data *dat) {
+    aodbm_rope *result = aodbm_data_to_rope_di(aodbm_data_from_32(dat->sz));
+    aodbm_rope_append(result, dat);
+    return result;
 }
 
-aodbm_data *make_block_di(aodbm_data *dat) {
-    return aodbm_cat_data_di(aodbm_data_from_32(dat->sz), dat);
+aodbm_rope *make_block_di(aodbm_data *dat) {
+    return aodbm_data2_to_rope_di(aodbm_data_from_32(dat->sz), dat);
 }
 
-aodbm_data *make_record(aodbm_data *key, aodbm_data *val) {
-    return aodbm_cat_data_di(make_block(key), make_block(val));
+aodbm_rope *make_record(aodbm_data *key, aodbm_data *val) {
+    return aodbm_rope_merge_di(make_block(key), make_block(val));
 }
 
-aodbm_data *make_record_di(aodbm_data *key, aodbm_data *val) {
-    return aodbm_cat_data_di(make_block_di(key), make_block_di(val));
+aodbm_rope *make_record_di(aodbm_data *key, aodbm_data *val) {
+    return aodbm_rope_merge_di(make_block_di(key), make_block_di(val));
 }
 
 typedef struct {
-    aodbm_data *node;
+    aodbm_rope *node;
     aodbm_data *key;
     uint64_t end_pos;
     uint32_t sz;
+    bool inserted;
 } range_result;
 
 range_result add_header(range_result result) {
-    aodbm_data *header = aodbm_cat_data_di(aodbm_data_from_str("l"),
-                                           aodbm_data_from_32(result.sz));
-    result.node = aodbm_cat_data_di(header, result.node);
+    aodbm_rope *header = aodbm_data2_to_rope_di(aodbm_data_from_str("l"),
+                                                aodbm_data_from_32(result.sz));
+    result.node = aodbm_rope_merge_di(header, result.node);
     return result;
 }
 
 range_result duplicate_range(aodbm *db,
                              uint64_t start_pos,
                              uint32_t num) {
-    aodbm_data *data = aodbm_data_empty();
+    aodbm_rope *data = aodbm_rope_empty();
     aodbm_data *key1;
     uint64_t pos = start_pos;
     uint32_t i;
@@ -346,7 +255,7 @@ range_result duplicate_range(aodbm *db,
         if (i == 0) {
             key1 = aodbm_data_dup(d_key);
         }
-        data = aodbm_cat_data_di(data, make_record_di(d_key, d_val));
+        data = aodbm_rope_merge_di(data, make_record_di(d_key, d_val));
     }
     
     range_result result;
@@ -354,6 +263,7 @@ range_result duplicate_range(aodbm *db,
     result.key = key1;
     result.end_pos = pos;
     result.sz = num;
+    result.inserted = false;
     return result;
 }
 
@@ -361,13 +271,14 @@ range_result insert_into_range(aodbm *db,
                                aodbm_data *key,
                                aodbm_data *val,
                                uint64_t start_pos,
-                               uint32_t num) {
-    aodbm_data *data = aodbm_data_empty();
+                               uint32_t num,
+                               bool insert_end) {
+    bool inserted;
+    aodbm_rope *data = aodbm_rope_empty();
     aodbm_data *key1 = NULL;
-    aodbm_data *i_rec = make_record(key, val);
+    aodbm_rope *i_rec = make_record(key, val);
     uint64_t pos = start_pos;
     uint32_t i;
-    bool inserted;
     for (i = 0; i < num; ++i) {
         aodbm_data *d_key = aodbm_read_data(db, pos);
         pos += d_key->sz + 4;
@@ -382,7 +293,7 @@ range_result insert_into_range(aodbm *db,
             inserted = false;
         }
         if (cmp != 1) {
-            data = aodbm_cat_data_di(data, i_rec);
+            data = aodbm_rope_merge_di(data, i_rec);
             if (i == 0) {
                 key1 = aodbm_data_dup(key);
             }
@@ -391,7 +302,7 @@ range_result insert_into_range(aodbm *db,
             if (key1 == NULL && i == 0) {
                 key1 = aodbm_data_dup(d_key);
             }
-            data = aodbm_cat_data_di(data, make_record_di(d_key, d_val));
+            data = aodbm_rope_merge_di(data, make_record_di(d_key, d_val));
         }
         if (cmp != 1) {
             break;
@@ -399,16 +310,22 @@ range_result insert_into_range(aodbm *db,
     }
     range_result result;
     result.key = key1;
+    result.inserted = true;
     if (i < num) {
         /* the loop was broken */
         range_result dup = duplicate_range(db, pos, num - i);
         aodbm_free_data(dup.key);
         
-        result.node = aodbm_cat_data_di(data, dup.node);
+        result.node = aodbm_rope_merge_di(data, dup.node);
         result.end_pos = dup.end_pos;
         result.sz = num + (inserted?1:0);
     } else {
-        result.node = aodbm_cat_data_di(data, i_rec);
+        if (insert_end) {
+            result.node = aodbm_rope_merge_di(data, i_rec);
+        } else {
+            result.node = data;
+            result.inserted = false;
+        }
         result.end_pos = pos;
         result.sz = num + 1;
     }
@@ -421,10 +338,13 @@ typedef struct {
 } set_result;
 
 typedef struct {
-    aodbm_data *a_node;
-    aodbm_data *b_node;
+    aodbm_rope *a_node;
+    aodbm_data *a_key;
+    aodbm_rope *b_node;
     aodbm_data *b_key;
 } leaf_result;
+
+/* TODO: finish me */
 
 /* pos is positioned just after the type byte */
 leaf_result insert_into_leaf(aodbm *db,
@@ -433,12 +353,24 @@ leaf_result insert_into_leaf(aodbm *db,
                              uint64_t pos) {
     uint32_t sz = aodbm_read32(db, pos);
     if (sz == MAX_NODE_SIZE) {
-        
+        range_result a_range =
+            insert_into_range(db, key, val, pos, MAX_NODE_SIZE/2, false);
+        if (a_range.inserted) {
+            range_result b_range =
+                duplicate_range(db, a_range.end_pos, MAX_NODE_SIZE/2);
+        } else {
+            range_result b_range =
+                insert_into_range(db, key, val, a_range.end_pos, MAX_NODE_SIZE/2, true);
+        }
     } else if (sz < MAX_NODE_SIZE) {
-        range_result range = add_header(insert_into_range(db, key, val, pos, sz));
-        aodbm_free_data(range.key);
-    
-        
+        range_result range =
+            add_header(insert_into_range(db, key, val, pos, sz, true));
+        leaf_result result;
+        result.a_node = range.node;
+        result.a_key = range.key;
+        result.b_node = NULL;
+        result.b_key = NULL;
+        return result;
     } else {
         printf("found a node with a size beyond MAX_NODE_SIZE\n");
         exit(1);
@@ -466,24 +398,7 @@ set_result aodbm_set_recursive(aodbm *db,
     if (type == 'b') {
         exit(1);
     } else {
-        if (sz == MAX_NODE_SIZE) {
-            /*split_leaf_result res = aodbm_split_leaf(db, key, val, pos);
-            if (res.b_node != NULL) {
-                
-            } else { 
-            
-            }*/
-        } else if (sz < MAX_NODE_SIZE) {
-            /*aodbm_data *res = aodbm_simple_insert_leaf(db, key, val, pos, sz);
-            set_result result;
-            result.a = append_pos;
-            result.b = 0;
-            result.append = res;
-            return result;*/
-        } else {
-            printf("found a node with greater than max node size\n");
-            exit(1);
-        }
+        exit(1);
     }
 }
 
@@ -499,56 +414,18 @@ aodbm_version aodbm_set(aodbm *db,
     aodbm_data *append;
     
     if (ver == 0) {
-        aodbm_data *node = aodbm_cat_data_di(aodbm_data_from_str("l"),
-                                             aodbm_data_from_32(1));
-        node = aodbm_cat_data_di(node, make_record(key, val));
-        append = aodbm_cat_data_di(root, node);
+        aodbm_rope *node = aodbm_data2_to_rope_di(aodbm_data_from_str("l"),
+                                                  aodbm_data_from_32(1));
+        node = aodbm_rope_merge_di(node, make_record(key, val));
+        aodbm_rope_prepend_di(root, node);
+        append = aodbm_rope_to_data_di(node);
         result = pos;
     } else {
         char type;
         aodbm_read(db, ver + 8, 1, &type);
         uint32_t sz = aodbm_read32(db, ver + 9);
         if (type == 'l') {
-            if (sz == MAX_NODE_SIZE) {
-                #if 0
-                split_leaf_result res =
-                    aodbm_split_leaf(db, key, val, ver + 13);
-                if (res.b_node == NULL) {
-                    append = aodbm_cat_data_di(root, res.append);
-                    result = pos;
-                } else {
-                    exit(1);
-                    /* make a new branch node */
-                    /* type */
-                    aodbm_data *node = aodbm_data_from_str("b");
-                    /* sz */
-                    node = aodbm_cat_data_di(node, aodbm_data_from_32(2));
-                    /* a_reference */
-                    node = aodbm_cat_data_di(node, aodbm_data_from_64(res.a));
-                    /* TODO: insert key */
-                    /* the key is the first entry in the second node */
-                    
-                    /* b_reference */
-                    node = aodbm_cat_data_di(node, aodbm_data_from_64(res.b));
-                    node = aodbm_cat_data_di(root, node);
-                    result = pos + res.append->sz;
-                    append = aodbm_cat_data_di(res.append, node);
-                }
-                #endif
-            } else if (sz < MAX_NODE_SIZE) {
-                #if 0
-                append = aodbm_simple_insert_leaf(db,
-                                                  key,
-                                                  val,
-                                                  ver + 13,
-                                                  sz);
-                append = aodbm_cat_data_di(root, append);
-                result = pos;
-                #endif
-            } else {
-                printf("found a node with greater than max node size\n");
-                exit(1);
-            }
+            exit(1);
         } else if (type = 'b') {
             exit(1);
         } else {
@@ -684,111 +561,4 @@ bool aodbm_is_based_on(aodbm *db, aodbm_version a, aodbm_version b) {
         return true;
     }
     return aodbm_is_based_on(db, aodbm_read64(db, a), b);
-}
-
-aodbm_data *aodbm_construct_data(const char *dat, size_t sz) {
-    aodbm_data *ptr = malloc(sizeof(aodbm_data));
-    ptr->sz = sz;
-    ptr->dat = malloc(sz);
-    memcpy(ptr->dat, dat, sz);
-    return ptr;
-}
-
-aodbm_data *aodbm_cat_data(aodbm_data *a, aodbm_data *b) {
-    aodbm_data *dat = malloc(sizeof(aodbm_data));
-    dat->sz = a->sz + b->sz;
-    dat->dat = malloc(dat->sz);
-    memcpy(dat->dat, a->dat, a->sz);
-    memcpy(dat->dat + a->sz, b->dat, b->sz);
-    return dat;
-}
-
-aodbm_data *aodbm_cat_data_di(aodbm_data *a, aodbm_data *b) {
-    aodbm_data *res = aodbm_cat_data(a, b);
-    aodbm_free_data(a);
-    aodbm_free_data(b);
-    return res;
-}
-
-aodbm_data *aodbm_data_from_str(const char *dat) {
-    return aodbm_construct_data(dat, strlen(dat));
-}
-
-aodbm_data *aodbm_data_from_32(uint32_t n) {
-    n = htonl(n);
-    return aodbm_construct_data((const char*)&n, 4);
-}
-
-aodbm_data *aodbm_data_from_64(uint64_t n) {
-    n = htonll(n);
-    return aodbm_construct_data((const char*)&n, 8);
-}
-
-aodbm_data *aodbm_data_empty() {
-    aodbm_data *dat = malloc(sizeof(aodbm_data));
-    dat->sz = 0;
-    dat->dat = NULL;
-    return dat;
-}
-
-bool aodbm_data_lt(aodbm_data *a, aodbm_data *b) {
-    int p;
-    int m = a->sz;
-    if (b->sz < m) {
-        m = b->sz;
-    }
-    for (p = 0; p < m; ++p) {
-        if (a->dat[p] < b->dat[p])
-            return true;
-        if (a->dat[p] > b->dat[p])
-            return false;
-    }
-    if (a->sz < b->sz) {
-        return true;
-    }
-    return false;
-}
-
-bool aodbm_data_gt(aodbm_data *a, aodbm_data *b) {
-    return aodbm_data_lt(b, a);
-}
-
-bool aodbm_data_lte(aodbm_data *a, aodbm_data *b) {
-    return !aodbm_data_gt(a, b);
-}
-
-bool aodbm_data_gte(aodbm_data *a, aodbm_data *b) {
-    return !aodbm_data_lt(a, b);
-}
-
-bool aodbm_data_eq(aodbm_data *a, aodbm_data *b) {
-    if (a->sz != b->sz) {
-        return false;
-    }
-    uint32_t i;
-    for (i = 0; i < a->sz; ++i) {
-        if (a->dat[i] != b->dat[i]) {
-            return false;
-        }
-    }
-    return true;
-}
-
-int aodbm_data_cmp(aodbm_data *a, aodbm_data *b) {
-    if (aodbm_data_eq(a, b)) {
-        return 0;
-    }
-    if (aodbm_data_lt(a, b)) {
-        return -1;
-    }
-    return 1;
-}
-
-aodbm_data *aodbm_data_dup(aodbm_data *v) {
-    return aodbm_construct_data(v->dat, v->sz);
-}
-
-void aodbm_free_data(aodbm_data *dat) {
-    free(dat->dat);
-    free(dat);
 }
