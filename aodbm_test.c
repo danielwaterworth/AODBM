@@ -22,8 +22,8 @@ int main() {
     
     aodbm_version new_ver = aodbm_set(db, ver, key, val);
     printf("written first set\n");
-    //new_ver = aodbm_set(db, new_ver, key1, val1);
-    //printf("written second set\n");
+    new_ver = aodbm_set(db, new_ver, key1, val1);
+    printf("written second set\n");
     
     aodbm_data *test = aodbm_get(db, new_ver, key);
     

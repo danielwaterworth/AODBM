@@ -27,13 +27,13 @@ aodbm_lib.aodbm_commit.argtypes = [ctypes.c_void_p, ctypes.c_uint64]
 aodbm_lib.aodbm_commit.restype = ctypes.c_bool
 
 aodbm_lib.aodbm_has.argtypes = [ctypes.c_void_p, ctypes.c_uint64, data_ptr]
-aodbm_lib.aodbm_has.restypes = ctypes.c_bool
+aodbm_lib.aodbm_has.restype = ctypes.c_bool
 
-aodbm_lib.aodbm_has.gettypes = [ctypes.c_void_p, ctypes.c_uint64, data_ptr]
-aodbm_lib.aodbm_has.gettypes = data_ptr
+aodbm_lib.aodbm_get.argtypes = [ctypes.c_void_p, ctypes.c_uint64, data_ptr]
+aodbm_lib.aodbm_get.restype = data_ptr
 
 aodbm_lib.aodbm_set.argtypes = [ctypes.c_void_p, ctypes.c_uint64, data_ptr, data_ptr]
-aodbm_lib.aodbm_set.restypes = ctypes.c_uint64
+aodbm_lib.aodbm_set.restype = ctypes.c_uint64
 
 class Version(object):
     def __init__(self, db, version):
@@ -45,10 +45,19 @@ class Version(object):
     
     def __getitem__(self, key):
         ptr = aodbm_lib.aodbm_get(self.db.db, self.version, str_to_data(key))
-        return ptr
+        if ptr == None:
+            return None
+        return data_to_str(ptr.contents)
+    
+    def __setitem__(self, key, val):
+        key = str_to_data(key)
+        val = str_to_data(val)
+        self.version = aodbm_lib.aodbm_set(self.db.db, self.version, key, val)
     
     def set_record(self, key, val):
-        return Version(self.db, aodbm_lib.aodbm_set(self.db.db, self.version, str_to_data(key), str_to_data(val)))
+        key = str_to_data(key)
+        val = str_to_data(val)
+        return Version(self.db, aodbm_lib.aodbm_set(self.db.db, self.version, key, val))
 
 class AODBM(object):
     def __init__(self, filename):

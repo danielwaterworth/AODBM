@@ -1,9 +1,10 @@
-#define MAX_NODE_SIZE 10
+#define MAX_NODE_SIZE 4 /* IMPORTANT: the number must be even */
 
 #include "string.h"
 #include "stdio.h"
 #include "stdlib.h"
 #include "pthread.h"
+#include "assert.h"
 
 #include <arpa/inet.h>
 
@@ -111,6 +112,7 @@ void aodbm_read(aodbm *db, uint64_t off, size_t sz, void *ptr) {
     fseek(db->fd, off, SEEK_SET);
     if (fread(ptr, 1, sz, db->fd) != sz) {
         printf("unexpected EOF\n");
+        assert(0);
         exit(1);
     }
     pthread_mutex_unlock(&db->rw);
@@ -256,12 +258,13 @@ range_result insert_into_range(aodbm *db,
     } else {
         if (insert_end) {
             result.node = aodbm_rope_merge_di(data, i_rec);
+            result.sz = num + 1;
         } else {
             result.node = data;
             result.inserted = false;
+            result.sz = num;
         }
         result.end_pos = pos;
-        result.sz = num + 1;
     }
     return result;
 }
@@ -284,6 +287,7 @@ leaf_result insert_into_leaf(aodbm *db,
                              aodbm_data *val,
                              uint64_t pos) {
     uint32_t sz = aodbm_read32(db, pos);
+    pos += 4;
     if (sz == MAX_NODE_SIZE) {
         range_result a_range =
             add_header(
@@ -377,9 +381,9 @@ aodbm_version aodbm_set(aodbm *db,
                 append = aodbm_rope_to_data_di(data);
                 result = append_pos;
             } else {
-                aodbm_free_data(leaf.a_key);
                 size_t a_sz = aodbm_rope_size(leaf.a_node);
                 size_t b_sz = aodbm_rope_size(leaf.b_node);
+                
                 aodbm_rope *data = aodbm_rope_merge_di(leaf.a_node, leaf.b_node);
                 size_t data_sz = a_sz + b_sz;
                 /* construct a new branch node */
@@ -388,7 +392,7 @@ aodbm_version aodbm_set(aodbm *db,
                 /* a position */
                 aodbm_rope_append_di(br, aodbm_data_from_64(append_pos));
                 /* b_key */
-                aodbm_rope_append_di(br, leaf.b_key);
+                br = aodbm_rope_merge_di(br, make_block_di(leaf.b_key));
                 /* b position */
                 aodbm_rope_append_di(br, aodbm_data_from_64(append_pos + a_sz));
                 aodbm_rope_prepend_di(root, br);
@@ -439,6 +443,7 @@ bool aodbm_has_recursive(aodbm *db, uint64_t node, aodbm_data *key) {
             off = aodbm_read64(db, pos);
             pos += 8;
         }
+        return aodbm_has_recursive(db, off, key);
     } else {
         for (i = 0; i < sz; ++i) {
             aodbm_data *dat = aodbm_read_data(db, pos);
@@ -488,6 +493,7 @@ aodbm_data *aodbm_get_recursive(aodbm *db, uint64_t node, aodbm_data *key) {
             off = aodbm_read64(db, pos);
             pos += 8;
         }
+        return aodbm_get_recursive(db, off, key);
     } else {
         for (i = 0; i < sz; ++i) {
             aodbm_data *dat = aodbm_read_data(db, pos);
