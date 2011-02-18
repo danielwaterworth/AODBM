@@ -1,3 +1,6 @@
 testdb
 *.o
+*.pyc
+*.so
+*.a
 aodbm_test
