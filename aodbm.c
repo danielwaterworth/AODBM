@@ -1,4 +1,5 @@
-#define MAX_NODE_SIZE 4 /* IMPORTANT: the number must be even */
+/* IMPORTANT: this number must be even */
+#define MAX_NODE_SIZE 4
 
 #include "string.h"
 #include "stdio.h"
@@ -14,13 +15,6 @@
 
 #include "aodbm.h"
 #include "aodbm_internal.h"
-
-struct aodbm {
-    FILE *fd;
-    pthread_mutex_t rw;
-    volatile uint64_t cur;
-    pthread_mutex_t version;
-};
 
 aodbm *aodbm_open(const char *filename) {
     aodbm *ptr = malloc(sizeof(aodbm));
@@ -60,6 +54,7 @@ aodbm *aodbm_open(const char *filename) {
             }
             sz = ntohl(sz);
             if (fseek(ptr->fd, sz, SEEK_CUR) != 0) {
+                /* TODO: check for EOF, truncate file */
                 printf("error, cannot seek\n");
                 exit(1);
             }
@@ -88,36 +83,6 @@ uint64_t aodbm_file_size(aodbm *db) {
     return pos;
 }
 
-void aodbm_write_data_block(aodbm *db, aodbm_data *data) {
-    pthread_mutex_lock(&db->rw);
-    fwrite("d", 1, 1, db->fd);
-    /* ensure size fits in 32bits */
-    uint32_t sz = htonl(data->sz);
-    fwrite(&sz, 1, 4, db->fd);
-    fwrite(data->dat, 1, data->sz, db->fd);
-    pthread_mutex_unlock(&db->rw);
-}
-
-void aodbm_write_version(aodbm *db, uint64_t ver) {
-    pthread_mutex_lock(&db->rw);
-    fwrite("v", 1, 1, db->fd);
-    uint64_t off = htonll(ver);
-    fwrite(&off, 1, 8, db->fd);
-    pthread_mutex_unlock(&db->rw);
-}
-
-void aodbm_read(aodbm *db, uint64_t off, size_t sz, void *ptr) {
-    /* TODO: modify to use mmap */
-    pthread_mutex_lock(&db->rw);
-    fseek(db->fd, off, SEEK_SET);
-    if (fread(ptr, 1, sz, db->fd) != sz) {
-        printf("unexpected EOF\n");
-        assert(0);
-        exit(1);
-    }
-    pthread_mutex_unlock(&db->rw);
-}
-
 uint64_t aodbm_current(aodbm *db) {
     uint64_t result;
     pthread_mutex_lock(&db->version);
@@ -137,27 +102,6 @@ bool aodbm_commit(aodbm *db, uint64_t version) {
     }
     pthread_mutex_unlock(&db->version);
     return result;
-}
-
-uint32_t aodbm_read32(aodbm *db, uint64_t off) {
-    uint32_t sz;
-    aodbm_read(db, off, 4, &sz);
-    return ntohl(sz);
-}
-
-uint64_t aodbm_read64(aodbm *db, uint64_t off) {
-    uint64_t sz;
-    aodbm_read(db, off, 8, &sz);
-    return ntohll(sz);
-}
-
-aodbm_data *aodbm_read_data(aodbm *db, uint64_t off) {
-    uint32_t sz = aodbm_read32(db, off);
-    aodbm_data *out = malloc(sizeof(aodbm_data));
-    out->sz = sz;
-    out->dat = malloc(sz);
-    aodbm_read(db, off+4, sz, out->dat);
-    return out;
 }
 
 typedef struct {
@@ -270,22 +214,17 @@ range_result insert_into_range(aodbm *db,
 }
 
 typedef struct {
-    uint64_t a, b;
-    aodbm_data *append;
-} set_result;
-
-typedef struct {
     aodbm_rope *a_node;
     aodbm_data *a_key;
     aodbm_rope *b_node;
     aodbm_data *b_key;
-} leaf_result;
+} insert_result;
 
 /* pos is positioned just after the type byte */
-leaf_result insert_into_leaf(aodbm *db,
-                             aodbm_data *key,
-                             aodbm_data *val,
-                             uint64_t pos) {
+insert_result insert_into_leaf(aodbm *db,
+                               aodbm_data *key,
+                               aodbm_data *val,
+                               uint64_t pos) {
     uint32_t sz = aodbm_read32(db, pos);
     pos += 4;
     if (sz == MAX_NODE_SIZE) {
@@ -305,7 +244,7 @@ leaf_result insert_into_leaf(aodbm *db,
                                                    MAX_NODE_SIZE/2,
                                                    true));
         }
-        leaf_result result;
+        insert_result result;
         result.a_node = a_range.node;
         result.a_key = a_range.key;
         result.b_node = b_range.node;
@@ -314,7 +253,7 @@ leaf_result insert_into_leaf(aodbm *db,
     } else if (sz < MAX_NODE_SIZE) {
         range_result range =
             add_header(insert_into_range(db, key, val, pos, sz, true));
-        leaf_result result;
+        insert_result result;
         result.a_node = range.node;
         result.a_key = range.key;
         result.b_node = NULL;
@@ -326,28 +265,25 @@ leaf_result insert_into_leaf(aodbm *db,
     }
 }
 
-/*
-  Given a node, return a new version of the node
-  the node must be ondisk
-*/
-set_result aodbm_set_recursive(aodbm *db,
-                               uint64_t node,
-                               aodbm_data *key,
-                               aodbm_data *val,
-                               aodbm_data *append,
-                               uint64_t append_pos) {
-    char type;
-    aodbm_read(db, node, 1, &type);
-    if (type != 'l' && type != 'b') {
-        printf("unknown node type\n");
-        exit(1);
-    }
-    uint32_t sz = aodbm_read32(db, node + 1);
-    uint64_t pos = node + 5;
-    if (type == 'b') {
-        exit(1);
-    } else {
-        exit(1);
+insert_result insert_into_branch(aodbm *db,
+                                 uint64_t node,
+                                 uint64_t node_a,
+                                 aodbm_data *a_key,
+                                 uint64_t node_b,
+                                 aodbm_data *b_key,
+                                 uint64_t rm) {
+    /* TODO: finish me */
+    uint64_t pos = node + 1;
+    uint32_t sz = aodbm_read32(db, pos);
+    pos += 4;
+    uint64_t off = aodbm_read64(db, pos);
+    pos += 8;
+    uint32_t i;
+    for (i = 0; i < sz; ++i) {
+        aodbm_data *key = aodbm_read_data(db, pos);
+        pos += key->sz + 4;
+        off = aodbm_read64(db, pos);
+        pos += 8;
     }
 }
 
@@ -373,7 +309,7 @@ aodbm_version aodbm_set(aodbm *db,
         char type;
         aodbm_read(db, ver + 8, 1, &type);
         if (type == 'l') {
-            leaf_result leaf = insert_into_leaf(db, key, val, ver + 9);
+            insert_result leaf = insert_into_leaf(db, key, val, ver + 9);
             aodbm_free_data(leaf.a_key);
             if (leaf.b_node == NULL) {
                 aodbm_rope *data = leaf.a_node;
@@ -403,7 +339,22 @@ aodbm_version aodbm_set(aodbm *db,
                 result = append_pos + data_sz;
             }
         } else if (type = 'b') {
-            exit(1);
+            /* TODO: finish me */
+            aodbm_rope *data = aodbm_rope_empty();
+            aodbm_path *path = aodbm_search_path(db, ver, key);
+            /* get the leaf node */
+            uint64_t node = aodbm_path_pop(&path);
+            insert_result nodes = insert_into_leaf(db, key, val, node + 1);
+            uint64_t prev_node = node;
+            for(; path != NULL; prev_node = node, node = aodbm_path_pop(&path)) {
+                /* insert the node(s) from the previous operation into this
+                   branch node, forming new node(s) where neccessary.
+                */
+                
+                //nodes = insert_into_branch(db, node, , nodes.a_key, , nodes.b_key, prev_node);
+            }
+            append = aodbm_rope_to_data_di(data);
+            // result =
         } else {
             printf("unknown node type\n");
             exit(1);
@@ -418,103 +369,57 @@ aodbm_version aodbm_set(aodbm *db,
     return result;
 }
 
-bool aodbm_has_recursive(aodbm *db, uint64_t node, aodbm_data *key) {
-    char type;
-    aodbm_read(db, node, 1, &type);
-    if (type != 'l' && type != 'b') {
-        printf("unknown node type\n");
-        exit(1);
-    }
-    uint32_t sz = aodbm_read32(db, node + 1);
-    uint32_t i;
-    uint64_t pos = node + 5;
-    if (type == 'b') {
-        /* node begins with an offset */
-        uint64_t off = aodbm_read64(db, pos);
-        pos += 8;
-        for (i = 0; i < sz; ++i) {
-            aodbm_data *dat = aodbm_read_data(db, pos);
-            pos += dat->sz + 4;
-            bool lt = aodbm_data_lt(key, dat);
-            aodbm_free_data(dat);
-            if (lt) {
-                return aodbm_has_recursive(db, off, key);
-            }
-            off = aodbm_read64(db, pos);
-            pos += 8;
-        }
-        return aodbm_has_recursive(db, off, key);
-    } else {
-        for (i = 0; i < sz; ++i) {
-            aodbm_data *dat = aodbm_read_data(db, pos);
-            pos += dat->sz + 4;
-            bool eq = aodbm_data_eq(dat, key);
-            aodbm_free_data(dat);
-            if (eq) {
-                return true;
-            }
-            aodbm_data *val = aodbm_read_data(db, pos);
-            pos += val->sz + 4;
-            aodbm_free_data(val);
-        }
-        return false;
-    }
-}
-
 bool aodbm_has(aodbm *db, aodbm_version ver, aodbm_data *key) {
     if (ver == 0) {
         return false;
     }
-    return aodbm_has_recursive(db, ver + 8, key);
-}
-
-aodbm_data *aodbm_get_recursive(aodbm *db, uint64_t node, aodbm_data *key) {
-    char type;
-    aodbm_read(db, node, 1, &type);
-    if (type != 'l' && type != 'b') {
-        printf("unknown node type\n");
-        exit(1);
-    }
-    uint32_t sz = aodbm_read32(db, node + 1);
+    uint64_t leaf_node = aodbm_search(db, ver, key);
+    uint32_t sz = aodbm_read32(db, leaf_node + 1);
     uint32_t i;
-    uint64_t pos = node + 5;
-    if (type == 'b') {
-        /* node begins with an offset */
-        uint64_t off = aodbm_read64(db, pos);
-        pos += 8;
-        for (i = 0; i < sz; ++i) {
-            aodbm_data *dat = aodbm_read_data(db, pos);
-            pos += dat->sz + 4;
-            if (aodbm_data_lt(key, dat)) {
-                aodbm_free_data(dat);
-                return aodbm_get_recursive(db, off, key);
-            }
-            aodbm_free_data(dat);
-            off = aodbm_read64(db, pos);
-            pos += 8;
+    uint64_t pos = leaf_node + 5;
+    for (i = 0; i < sz; ++i) {
+        aodbm_data *r_key = aodbm_read_data(db, pos);
+        pos += r_key->sz + 4;
+        aodbm_data *r_val = aodbm_read_data(db, pos);
+        pos += r_val->sz + 4;
+        
+        bool eq = aodbm_data_eq(key, r_key);
+        
+        aodbm_free_data(r_key);
+        aodbm_free_data(r_val);
+        
+        if (eq) {
+            return true;
         }
-        return aodbm_get_recursive(db, off, key);
-    } else {
-        for (i = 0; i < sz; ++i) {
-            aodbm_data *dat = aodbm_read_data(db, pos);
-            pos += dat->sz + 4;
-            aodbm_data *val = aodbm_read_data(db, pos);
-            pos += val->sz + 4;
-            if (aodbm_data_eq(dat, key)) {
-                return val;
-            }
-            aodbm_free_data(dat);
-            aodbm_free_data(val);
-        }
-        return NULL;
     }
+    return false;
 }
 
 aodbm_data *aodbm_get(aodbm *db, aodbm_version ver, aodbm_data *key) {
     if (ver == 0) {
         return NULL;
     }
-    return aodbm_get_recursive(db, ver + 8, key);
+    uint64_t leaf_node = aodbm_search(db, ver, key);
+    uint32_t sz = aodbm_read32(db, leaf_node + 1);
+    uint32_t i;
+    uint64_t pos = leaf_node + 5;
+    for (i = 0; i < sz; ++i) {
+        aodbm_data *r_key = aodbm_read_data(db, pos);
+        pos += r_key->sz + 4;
+        aodbm_data *r_val = aodbm_read_data(db, pos);
+        pos += r_val->sz + 4;
+        
+        bool eq = aodbm_data_eq(key, r_key);
+        
+        aodbm_free_data(r_key);
+        
+        if (eq) {
+            return r_val;
+        }
+        
+        aodbm_free_data(r_val);
+    }
+    return NULL;
 }
 
 aodbm_version aodbm_del(aodbm *db, aodbm_version ver, aodbm_data *key) {

@@ -1,6 +1,14 @@
 #include "stdio.h"
+#include "stdlib.h"
+#include "assert.h"
 
 #include "aodbm_internal.h"
+
+#include <arpa/inet.h>
+
+#define ntohll(x) ( ( (uint64_t)(ntohl( (uint32_t)((x << 32) >> 32) )) << 32) |\
+    ntohl( ((uint32_t)(x >> 32)) ) )                                        
+#define htonll(x) ntohll(x)
 
 void print_hex(char c) {
     printf("\\x%.2x", c);
@@ -67,4 +75,185 @@ aodbm_rope *make_record(aodbm_data *key, aodbm_data *val) {
 
 aodbm_rope *make_record_di(aodbm_data *key, aodbm_data *val) {
     return aodbm_rope_merge_di(make_block_di(key), make_block_di(val));
+}
+
+void aodbm_write_data_block(aodbm *db, aodbm_data *data) {
+    pthread_mutex_lock(&db->rw);
+    fwrite("d", 1, 1, db->fd);
+    /* ensure size fits in 32bits */
+    uint32_t sz = htonl(data->sz);
+    fwrite(&sz, 1, 4, db->fd);
+    fwrite(data->dat, 1, data->sz, db->fd);
+    pthread_mutex_unlock(&db->rw);
+}
+
+void aodbm_write_version(aodbm *db, uint64_t ver) {
+    pthread_mutex_lock(&db->rw);
+    fwrite("v", 1, 1, db->fd);
+    uint64_t off = htonll(ver);
+    fwrite(&off, 1, 8, db->fd);
+    pthread_mutex_unlock(&db->rw);
+}
+
+void aodbm_read(aodbm *db, uint64_t off, size_t sz, void *ptr) {
+    /* TODO: modify to use mmap */
+    pthread_mutex_lock(&db->rw);
+    fseek(db->fd, off, SEEK_SET);
+    if (fread(ptr, 1, sz, db->fd) != sz) {
+        printf("unexpected EOF\n");
+        assert(0);
+        exit(1);
+    }
+    pthread_mutex_unlock(&db->rw);
+}
+
+uint32_t aodbm_read32(aodbm *db, uint64_t off) {
+    uint32_t sz;
+    aodbm_read(db, off, 4, &sz);
+    return ntohl(sz);
+}
+
+uint64_t aodbm_read64(aodbm *db, uint64_t off) {
+    uint64_t sz;
+    aodbm_read(db, off, 8, &sz);
+    return ntohll(sz);
+}
+
+aodbm_data *aodbm_read_data(aodbm *db, uint64_t off) {
+    uint32_t sz = aodbm_read32(db, off);
+    aodbm_data *out = malloc(sizeof(aodbm_data));
+    out->sz = sz;
+    out->dat = malloc(sz);
+    aodbm_read(db, off+4, sz, out->dat);
+    return out;
+}
+
+uint64_t aodbm_search_recursive(aodbm *db, uint64_t node, aodbm_data *key) {
+    char type;
+    aodbm_read(db, node, 1, &type);
+    if (type == 'l') {
+        return node;
+    }
+    if (type == 'b') {
+        uint32_t sz = aodbm_read32(db, node + 1);
+        uint64_t pos = node + 5;
+        /* node begins with an offset */
+        uint64_t off = aodbm_read64(db, pos);
+        pos += 8;
+        uint32_t i;
+        for (i = 0; i < sz; ++i) {
+            aodbm_data *dat = aodbm_read_data(db, pos);
+            pos += dat->sz + 4;
+            bool lt = aodbm_data_lt(key, dat);
+            aodbm_free_data(dat);
+            if (lt) {
+                return aodbm_search_recursive(db, off, key);
+            }
+            off = aodbm_read64(db, pos);
+            pos += 8;
+        }
+        return aodbm_search_recursive(db, off, key);
+    } else {
+        printf("unknown node type\n");
+        exit(1);
+    }
+}
+
+/* returns the offset of the leaf node that the key belongs in */
+uint64_t aodbm_search(aodbm *db, aodbm_version version, aodbm_data *key) {
+    if (version == 0) {
+        printf("error, given the 0 version for a search\n");
+        exit(1);
+    }
+    return aodbm_search_recursive(db, version + 8, key);
+}
+
+struct aodbm_path {
+    aodbm_path *up;
+    uint64_t node;
+};
+
+void aodbm_path_print(aodbm_path *path) {
+    aodbm_path *it;
+    printf("[");
+    for (it = path; it->up != NULL; it = it->up) {
+        printf("%llu, ", it->node);
+    }
+    printf("%llu]", it->up->node);
+}
+
+void aodbm_path_push(aodbm_path **path, uint64_t node) {
+    aodbm_path *new = malloc(sizeof(aodbm_path));
+    new->node = node;
+    if (*path == NULL) {
+        new->up = NULL;
+    } else {
+        new->up = *path;
+    }
+    *path = new;
+}
+
+uint64_t aodbm_path_pop(aodbm_path **path) {
+    if (*path == NULL) {
+        printf("cannot pop an empty aodbm_path\n");
+        exit(1);
+    } else {
+        uint64_t result = (*path)->node;
+        aodbm_path *fr = *path;
+        *path = (*path)->up;
+        free(fr);
+        return result;
+    }
+}
+
+void aodbm_free_path(aodbm_path *path) {
+    while (path != NULL) {
+        aodbm_path_pop(&path);
+    }
+}
+
+void aodbm_search_path_recursive
+                (aodbm *db, uint64_t node, aodbm_data *key, aodbm_path **path) {
+    aodbm_path_push(path, node);
+    
+    char type;
+    aodbm_read(db, node, 1, &type);
+    if (type == 'l') {
+        return;
+    }
+    if (type == 'b') {
+        uint32_t sz = aodbm_read32(db, node + 1);
+        uint64_t pos = node + 5;
+        /* node begins with an offset */
+        uint64_t off = aodbm_read64(db, pos);
+        pos += 8;
+        uint32_t i;
+        for (i = 0; i < sz; ++i) {
+            aodbm_data *dat = aodbm_read_data(db, pos);
+            pos += dat->sz + 4;
+            bool lt = aodbm_data_lt(key, dat);
+            aodbm_free_data(dat);
+            if (lt) {
+                aodbm_search_path_recursive(db, off, key, path);
+                return;
+            }
+            off = aodbm_read64(db, pos);
+            pos += 8;
+        }
+        aodbm_search_path_recursive(db, off, key, path);
+        return;
+    } else {
+        printf("unknown node type\n");
+        exit(1);
+    }
+}
+
+aodbm_path *aodbm_search_path(aodbm *db, aodbm_version ver, aodbm_data *key) {
+    if (ver == 0) {
+        printf("error, given the 0 version for a search\n");
+        exit(1);
+    }
+    aodbm_path *path = NULL;
+    aodbm_search_path_recursive(db, ver + 8, key, &path);
+    return path;
 }
