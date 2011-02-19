@@ -329,6 +329,12 @@ void merge_branches(branch *a, branch *b) {
     }
 }
 
+aodbm_rope *branch_to_rope(branch *br) {
+    aodbm_rope *header = aodbm_data2_to_rope(aodbm_data_from_str("b"),
+                                             aodbm_data_from_32(br->sz));
+    return aodbm_rope_merge_di(header, br->data);
+}
+
 insert_result insert_into_branch(aodbm *db,
                                  uint64_t node,
                                  aodbm_data *node_key,
@@ -387,13 +393,21 @@ insert_result insert_into_branch(aodbm *db,
         add_to_branches(&a, &b, b_key, node_b);
     }
     
+    insert_result result;
     if (b.sz < MAX_NODE_SIZE/2) {
         merge_branches(&a, &b);
+        result.a_node = branch_to_rope(&a);
+        result.a_key = a.key;
+        result.b_node = NULL;
+        result.b_key = NULL;
+        return result;
+    } else {
+        result.a_node = branch_to_rope(&a);
+        result.b_node = branch_to_rope(&b);
+        result.a_key = a.key;
+        result.b_key = b.key;
+        return result;
     }
-    
-    /* prepare output */
-    
-    /* add headers */
 }
 
 aodbm_version aodbm_set(aodbm *db,
