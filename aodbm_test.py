@@ -10,6 +10,7 @@ for i in l:
     ver['~' + str(i) + '~'] = 'world' + str(i)
 print ver.version
 print "written"
+#ver = aodbm.Version(db, 4575053)
 for i in xrange(n):
-    print ver['~' + str(i) + '~']
+    assert ver['~' + str(i) + '~'] == 'world' + str(i)
 

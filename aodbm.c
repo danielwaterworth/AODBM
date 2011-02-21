@@ -1,4 +1,6 @@
-/* IMPORTANT: this number must be even and >= 4 */
+/* IMPORTANT: this number must be even and >= 4
+   a higher number means bigger files, longer writes, faster reads (to a point)
+*/
 #define MAX_NODE_SIZE 4
 
 #include "string.h"
@@ -330,7 +332,7 @@ void add_to_branch(branch *node, aodbm_data *key, uint64_t off) {
 }
 
 void add_to_branches_di(branch *a, branch *b, aodbm_data *key, uint64_t off) {
-    if (a->sz < MAX_NODE_SIZE/2) {
+    if (a->sz + 1 < MAX_NODE_SIZE/2) {
         add_to_branch_di(a, key, off);
     } else {
         add_to_branch_di(b, key, off);
@@ -364,20 +366,6 @@ insert_result insert_into_branch(aodbm *db,
                                  uint64_t node_b,
                                  aodbm_data *b_key,
                                  uint64_t rm) {
-    printf("node: %llu\n", node);
-    annotate_data("node_key", node_key);
-    printf("node_a: %llu\n", node_a);
-    annotate_data("a_key", a_key);
-    if (b_key != NULL) {
-        printf("node_b: %llu\n", node_b);
-        annotate_data("b_key", b_key);
-    }
-    
-    if (b_key != NULL) {
-        assert (aodbm_data_le(a_key, b_key));
-    }
-    assert (aodbm_data_le(node_key, a_key));
-    
     branch a, b;
     branch_init(&a);
     branch_init(&b);
@@ -394,8 +382,6 @@ insert_result insert_into_branch(aodbm *db,
     bool b_placed = b_key == NULL;
     
     if (off != rm) {
-        aodbm_print_data(node_key);
-        printf(" %i\n", __LINE__);
         add_to_branches(&a, &b, node_key, off);
     }
     
@@ -408,15 +394,11 @@ insert_result insert_into_branch(aodbm *db,
         if (!a_placed) {
             if (aodbm_data_lt(a_key, key)) {
                 a_placed = true;
-                aodbm_print_data(a_key);
-                printf(" %i\n", __LINE__);
                 add_to_branches(&a, &b, a_key, node_a);
             }
             if (!b_placed) {
                 if (aodbm_data_lt(b_key, key)) {
                     b_placed = true;
-                    aodbm_print_data(b_key);
-                    printf(" %i\n", __LINE__);
                     add_to_branches(&a, &b, b_key, node_b);
                 }
             }
@@ -424,33 +406,25 @@ insert_result insert_into_branch(aodbm *db,
             if (!b_placed) {
                 if (aodbm_data_lt(b_key, key)) {
                     b_placed = true;
-                    aodbm_print_data(b_key);
-                    printf(" %i\n", __LINE__);
                     add_to_branches(&a, &b, b_key, node_b);
                 }
             }
         }
         
         if (off != rm) {
-            aodbm_print_data(key);
-            printf(" %i\n", __LINE__);
             add_to_branches_di(&a, &b, key, off);
         }
     }
     
     if (!a_placed) {
-        aodbm_print_data(a_key);
-        printf(" %i\n", __LINE__);
         add_to_branches(&a, &b, a_key, node_a);
     }
     if (!b_placed) {
-        aodbm_print_data(b_key);
-        printf(" %i\n", __LINE__);
         add_to_branches(&a, &b, b_key, node_b);
     }
     
     insert_result result;
-    if (b.sz < MAX_NODE_SIZE/2) {
+    if (b.sz + 1 < MAX_NODE_SIZE/2) {
         merge_branches(&a, &b);
         result.a_node = branch_to_rope(&a);
         result.a_key = a.key;
@@ -461,11 +435,6 @@ insert_result insert_into_branch(aodbm *db,
         result.b_node = branch_to_rope(&b);
         result.a_key = a.key;
         result.b_key = b.key;
-    }
-    printf("\n");
-    annotate_rope("a_node", result.a_node);
-    if (result.b_node != NULL) {
-        annotate_rope("b_node", result.b_node);
     }
     return result;
 }
