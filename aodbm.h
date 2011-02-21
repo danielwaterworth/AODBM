@@ -34,6 +34,11 @@ uint64_t aodbm_file_size(aodbm *);
 aodbm_version aodbm_current(aodbm *);
 bool aodbm_commit(aodbm *, aodbm_version);
 
+/* two phase commit */
+bool aodbm_commit_init(aodbm *db, uint64_t version);
+void aodbm_commit_finish(aodbm *db, uint64_t version);
+void aodbm_commit_abort(aodbm *db);
+
 bool aodbm_has(aodbm *, aodbm_version, aodbm_data *);
 aodbm_version aodbm_set(aodbm *, aodbm_version, aodbm_data *, aodbm_data *);
 aodbm_data *aodbm_get(aodbm *, aodbm_version, aodbm_data *);

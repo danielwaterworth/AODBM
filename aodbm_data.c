@@ -56,20 +56,19 @@ aodbm_data *aodbm_data_empty() {
 
 bool aodbm_data_lt(aodbm_data *a, aodbm_data *b) {
     int p;
-    int m = a->sz;
-    if (b->sz < m) {
-        m = b->sz;
-    }
-    for (p = 0; p < m; ++p) {
-        if (a->dat[p] < b->dat[p])
-            return true;
-        if (a->dat[p] > b->dat[p])
-            return false;
-    }
     if (a->sz < b->sz) {
         return true;
+    } else if (a->sz > b->sz) {
+        return false;
+    } else {
+        for (p = 0; p < a->sz; ++p) {
+            if (a->dat[p] < b->dat[p])
+                return true;
+            if (a->dat[p] > b->dat[p])
+                return false;
+        }
+        return false;
     }
-    return false;
 }
 
 bool aodbm_data_gt(aodbm_data *a, aodbm_data *b) {

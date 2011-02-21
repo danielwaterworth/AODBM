@@ -35,6 +35,9 @@ aodbm_lib.aodbm_get.restype = data_ptr
 aodbm_lib.aodbm_set.argtypes = [ctypes.c_void_p, ctypes.c_uint64, data_ptr, data_ptr]
 aodbm_lib.aodbm_set.restype = ctypes.c_uint64
 
+aodbm_lib.aodbm_data_lt.argtypes = [data_ptr, data_ptr]
+aodbm_lib.aodbm_data_lt.restype = ctypes.c_bool
+
 class Version(object):
     def __init__(self, db, version):
         self.db = db
@@ -72,3 +75,6 @@ class AODBM(object):
     def commit(self, version):
         assert self.db == version.db
         return aodbm_lib.aodbm_commit(self.db, version)
+
+def lt(a, b):
+    return aodbm_lib.aodbm_data_lt(str_to_data(a), str_to_data(b))

@@ -10,7 +10,7 @@
     ntohl( ((uint32_t)(x >> 32)) ) )                                        
 #define htonll(x) ntohll(x)
 
-void print_hex(char c) {
+void print_hex(unsigned char c) {
     printf("\\x%.2x", c);
 }
 
@@ -170,19 +170,19 @@ uint64_t aodbm_search(aodbm *db, aodbm_version version, aodbm_data *key) {
 
 struct aodbm_path {
     aodbm_path *up;
-    uint64_t node;
+    aodbm_path_node node;
 };
 
 void aodbm_path_print(aodbm_path *path) {
     aodbm_path *it;
     printf("[");
     for (it = path; it->up != NULL; it = it->up) {
-        printf("%llu, ", it->node);
+        printf("%llu, ", it->node.node);
     }
-    printf("%llu]", it->up->node);
+    printf("%llu]", it->node.node);
 }
 
-void aodbm_path_push(aodbm_path **path, uint64_t node) {
+void aodbm_path_push(aodbm_path **path, aodbm_path_node node) {
     aodbm_path *new = malloc(sizeof(aodbm_path));
     new->node = node;
     if (*path == NULL) {
@@ -193,12 +193,12 @@ void aodbm_path_push(aodbm_path **path, uint64_t node) {
     *path = new;
 }
 
-uint64_t aodbm_path_pop(aodbm_path **path) {
+aodbm_path_node aodbm_path_pop(aodbm_path **path) {
     if (*path == NULL) {
         printf("cannot pop an empty aodbm_path\n");
         exit(1);
     } else {
-        uint64_t result = (*path)->node;
+        aodbm_path_node result = (*path)->node;
         aodbm_path *fr = *path;
         *path = (*path)->up;
         free(fr);
@@ -206,15 +206,13 @@ uint64_t aodbm_path_pop(aodbm_path **path) {
     }
 }
 
-void aodbm_free_path(aodbm_path *path) {
-    while (path != NULL) {
-        aodbm_path_pop(&path);
-    }
-}
-
-void aodbm_search_path_recursive
-                (aodbm *db, uint64_t node, aodbm_data *key, aodbm_path **path) {
-    aodbm_path_push(path, node);
+void aodbm_search_path_recursive(aodbm *db,
+                                 uint64_t node,
+                                 aodbm_data *node_key,
+                                 aodbm_data *key,
+                                 aodbm_path **path) {
+    aodbm_path_node path_node = {node_key, node};
+    aodbm_path_push(path, path_node);
     
     char type;
     aodbm_read(db, node, 1, &type);
@@ -228,19 +226,21 @@ void aodbm_search_path_recursive
         uint64_t off = aodbm_read64(db, pos);
         pos += 8;
         uint32_t i;
+        aodbm_data *dat;
         for (i = 0; i < sz; ++i) {
-            aodbm_data *dat = aodbm_read_data(db, pos);
+            dat = aodbm_read_data(db, pos);
             pos += dat->sz + 4;
-            bool lt = aodbm_data_lt(key, dat);
-            aodbm_free_data(dat);
-            if (lt) {
-                aodbm_search_path_recursive(db, off, key, path);
+            if (aodbm_data_lt(key, dat)) {
+                aodbm_search_path_recursive(db, off, dat, key, path);
                 return;
+            }
+            if (i != sz - 1) {
+                aodbm_free_data(dat);
             }
             off = aodbm_read64(db, pos);
             pos += 8;
         }
-        aodbm_search_path_recursive(db, off, key, path);
+        aodbm_search_path_recursive(db, off, dat, key, path);
         return;
     } else {
         printf("unknown node type\n");
@@ -254,6 +254,6 @@ aodbm_path *aodbm_search_path(aodbm *db, aodbm_version ver, aodbm_data *key) {
         exit(1);
     }
     aodbm_path *path = NULL;
-    aodbm_search_path_recursive(db, ver + 8, key, &path);
+    aodbm_search_path_recursive(db, ver + 8, aodbm_data_empty(), key, &path);
     return path;
 }

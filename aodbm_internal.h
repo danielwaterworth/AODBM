@@ -10,7 +10,7 @@ struct aodbm {
     pthread_mutex_t version;
 };
 
-void print_hex(char);
+void print_hex(unsigned char);
 void annotate_data(const char *name, aodbm_data *);
 void annotate_rope(const char *name, aodbm_rope *);
 
@@ -29,11 +29,18 @@ aodbm_data *aodbm_read_data(aodbm *db, uint64_t off);
 /* returns the offset of the leaf node that the key belongs in */
 uint64_t aodbm_search(aodbm *, aodbm_version, aodbm_data *);
 
+struct aodbm_path_node {
+    aodbm_data *key;
+    uint64_t node;
+};
+
+typedef struct aodbm_path_node aodbm_path_node;
+
 struct aodbm_path;
 typedef struct aodbm_path aodbm_path;
 
-void aodbm_path_push(aodbm_path **, uint64_t);
-uint64_t aodbm_path_pop(aodbm_path **);
+void aodbm_path_push(aodbm_path **, aodbm_path_node);
+aodbm_path_node aodbm_path_pop(aodbm_path **);
 void aodbm_path_print(aodbm_path *);
 
 aodbm_path *aodbm_search_path(aodbm *, aodbm_version, aodbm_data *);
