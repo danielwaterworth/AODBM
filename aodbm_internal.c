@@ -211,6 +211,7 @@ void aodbm_search_path_recursive(aodbm *db,
                                  aodbm_data *node_key,
                                  aodbm_data *key,
                                  aodbm_path **path) {
+    assert (aodbm_data_le(node_key, key));
     aodbm_path_node path_node = {node_key, node};
     aodbm_path_push(path, path_node);
     
@@ -220,6 +221,7 @@ void aodbm_search_path_recursive(aodbm *db,
         return;
     }
     if (type == 'b') {
+        aodbm_data *prev_key = aodbm_data_dup(node_key);
         uint32_t sz = aodbm_read32(db, node + 1);
         uint64_t pos = node + 5;
         /* node begins with an offset */
@@ -231,16 +233,16 @@ void aodbm_search_path_recursive(aodbm *db,
             dat = aodbm_read_data(db, pos);
             pos += dat->sz + 4;
             if (aodbm_data_lt(key, dat)) {
-                aodbm_search_path_recursive(db, off, dat, key, path);
+                aodbm_free_data(dat);
+                aodbm_search_path_recursive(db, off, prev_key, key, path);
                 return;
             }
-            if (i != sz - 1) {
-                aodbm_free_data(dat);
-            }
+            aodbm_free_data(prev_key);
+            prev_key = dat;
             off = aodbm_read64(db, pos);
             pos += 8;
         }
-        aodbm_search_path_recursive(db, off, dat, key, path);
+        aodbm_search_path_recursive(db, off, prev_key, key, path);
         return;
     } else {
         printf("unknown node type\n");

@@ -1,13 +1,15 @@
-import aodbm
+import aodbm, random
 
-n = 100
+n = 10000
 
 db = aodbm.AODBM("testdb")
 ver = db.current_version()
-for i in reversed(xrange(n)):
-    ver['hello' + str(i)] = 'world' + str(i)
+l = range(n)
+random.shuffle(l)
+for i in l:
+    ver['~' + str(i) + '~'] = 'world' + str(i)
 print ver.version
 print "written"
 for i in xrange(n):
-    print ver['hello' + str(i)]
+    print ver['~' + str(i) + '~']
 

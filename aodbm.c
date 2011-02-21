@@ -364,6 +364,20 @@ insert_result insert_into_branch(aodbm *db,
                                  uint64_t node_b,
                                  aodbm_data *b_key,
                                  uint64_t rm) {
+    printf("node: %llu\n", node);
+    annotate_data("node_key", node_key);
+    printf("node_a: %llu\n", node_a);
+    annotate_data("a_key", a_key);
+    if (b_key != NULL) {
+        printf("node_b: %llu\n", node_b);
+        annotate_data("b_key", b_key);
+    }
+    
+    if (b_key != NULL) {
+        assert (aodbm_data_le(a_key, b_key));
+    }
+    assert (aodbm_data_le(node_key, a_key));
+    
     branch a, b;
     branch_init(&a);
     branch_init(&b);
@@ -375,13 +389,16 @@ insert_result insert_into_branch(aodbm *db,
     uint64_t off = aodbm_read64(db, pos);
     pos += 8;
     
-    if (off != rm) {
-        add_to_branches(&a, &b, node_key, off);
-    }
-    
     uint32_t i;
     bool a_placed = false;
     bool b_placed = b_key == NULL;
+    
+    if (off != rm) {
+        aodbm_print_data(node_key);
+        printf(" %i\n", __LINE__);
+        add_to_branches(&a, &b, node_key, off);
+    }
+    
     for (i = 0; i < sz; ++i) {
         aodbm_data *key = aodbm_read_data(db, pos);
         pos += 4 + key->sz;
@@ -391,11 +408,15 @@ insert_result insert_into_branch(aodbm *db,
         if (!a_placed) {
             if (aodbm_data_lt(a_key, key)) {
                 a_placed = true;
+                aodbm_print_data(a_key);
+                printf(" %i\n", __LINE__);
                 add_to_branches(&a, &b, a_key, node_a);
             }
             if (!b_placed) {
                 if (aodbm_data_lt(b_key, key)) {
                     b_placed = true;
+                    aodbm_print_data(b_key);
+                    printf(" %i\n", __LINE__);
                     add_to_branches(&a, &b, b_key, node_b);
                 }
             }
@@ -403,20 +424,28 @@ insert_result insert_into_branch(aodbm *db,
             if (!b_placed) {
                 if (aodbm_data_lt(b_key, key)) {
                     b_placed = true;
+                    aodbm_print_data(b_key);
+                    printf(" %i\n", __LINE__);
                     add_to_branches(&a, &b, b_key, node_b);
                 }
             }
         }
         
         if (off != rm) {
+            aodbm_print_data(key);
+            printf(" %i\n", __LINE__);
             add_to_branches_di(&a, &b, key, off);
         }
     }
     
     if (!a_placed) {
+        aodbm_print_data(a_key);
+        printf(" %i\n", __LINE__);
         add_to_branches(&a, &b, a_key, node_a);
     }
     if (!b_placed) {
+        aodbm_print_data(b_key);
+        printf(" %i\n", __LINE__);
         add_to_branches(&a, &b, b_key, node_b);
     }
     
@@ -432,6 +461,11 @@ insert_result insert_into_branch(aodbm *db,
         result.b_node = branch_to_rope(&b);
         result.a_key = a.key;
         result.b_key = b.key;
+    }
+    printf("\n");
+    annotate_rope("a_node", result.a_node);
+    if (result.b_node != NULL) {
+        annotate_rope("b_node", result.b_node);
     }
     return result;
 }

@@ -75,11 +75,11 @@ bool aodbm_data_gt(aodbm_data *a, aodbm_data *b) {
     return aodbm_data_lt(b, a);
 }
 
-bool aodbm_data_lte(aodbm_data *a, aodbm_data *b) {
+bool aodbm_data_le(aodbm_data *a, aodbm_data *b) {
     return !aodbm_data_gt(a, b);
 }
 
-bool aodbm_data_gte(aodbm_data *a, aodbm_data *b) {
+bool aodbm_data_ge(aodbm_data *a, aodbm_data *b) {
     return !aodbm_data_lt(a, b);
 }
 

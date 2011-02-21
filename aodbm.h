@@ -60,8 +60,8 @@ aodbm_data *aodbm_data_dup(aodbm_data *);
 
 bool aodbm_data_lt(aodbm_data *, aodbm_data *);
 bool aodbm_data_gt(aodbm_data *, aodbm_data *);
-bool aodbm_data_lte(aodbm_data *, aodbm_data *);
-bool aodbm_data_gte(aodbm_data *, aodbm_data *);
+bool aodbm_data_le(aodbm_data *, aodbm_data *);
+bool aodbm_data_ge(aodbm_data *, aodbm_data *);
 bool aodbm_data_eq(aodbm_data *, aodbm_data *);
 int aodbm_data_cmp(aodbm_data *, aodbm_data *);
 
