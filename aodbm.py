@@ -35,6 +35,9 @@ aodbm_lib.aodbm_get.restype = data_ptr
 aodbm_lib.aodbm_set.argtypes = [ctypes.c_void_p, ctypes.c_uint64, data_ptr, data_ptr]
 aodbm_lib.aodbm_set.restype = ctypes.c_uint64
 
+aodbm_lib.aodbm_del.argtypes = [ctypes.c_void_p, ctypes.c_uint64, data_ptr]
+aodbm_lib.aodbm_del.restype = ctypes.c_uint64
+
 aodbm_lib.aodbm_data_lt.argtypes = [data_ptr, data_ptr]
 aodbm_lib.aodbm_data_lt.restype = ctypes.c_bool
 
@@ -57,6 +60,14 @@ class Version(object):
         val = str_to_data(val)
         self.version = aodbm_lib.aodbm_set(self.db.db, self.version, key, val)
     
+    def __delitem__(self, key):
+        key = str_to_data(key)
+        self.version = aodbm_lib.aodbm_del(self.db.db, self.version, key)
+    
+    def del_key(self, key):
+        key = str_to_data(key)
+        return Version(self.db, aodbm_lib.aodbm_del(self.db.db, self.version, key))
+    
     def set_record(self, key, val):
         key = str_to_data(key)
         val = str_to_data(val)
@@ -73,8 +84,8 @@ class AODBM(object):
         return Version(self, aodbm_lib.aodbm_current(self.db))
     
     def commit(self, version):
-        assert self.db == version.db
-        return aodbm_lib.aodbm_commit(self.db, version)
+        assert self == version.db
+        return aodbm_lib.aodbm_commit(self.db, version.version)
 
 def lt(a, b):
     return aodbm_lib.aodbm_data_lt(str_to_data(a), str_to_data(b))

@@ -1,3 +1,8 @@
+/* bool __sync_bool_compare_and_swap (type *ptr, type oldval, type newval) */
+/* TODO: add iteration api */
+/* TODO: better support for trees as values */
+/* TODO: make a function to get the previous tree */
+
 #ifndef AODBM
 #define AODBM
 
