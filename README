@@ -1,0 +1,72 @@
+aodbm - Append Only Database Manager
+====================================
+
+An append only database manager in the style of dbm. It has both a C and a 
+Python interface and is ACID compliant. Internally it uses a B+ Tree. (Being 
+append only doesn't mean that you can't replace records or delete keys).
+
+Getting Started
+===============
+
+$ make
+
+This will build a static and shared library.
+
+Python interface
+================
+
+# import the module
+>>> import aodbm
+# create a database object
+>>> db = aodbm.AODBM('testdb')
+# get the current version of the database
+>>> version = db.current_version()
+# versions updated either in place or by creating new versions
+# in place:
+>>> version['hello'] = 'world'
+>>> version['hello']
+"world"
+>>> del version['hello']
+# new versions
+>>> new_version = version.set_record('hello', 'world')
+>>> new_version['hello']
+"world"
+>>> version['hello']
+Traceback (most recent call last):
+  File "<stdin>", line 1, in <module>
+  File "aodbm.py", line 56, in __getitem__
+    raise KeyError()
+KeyError
+>>> newest_version = new_version.del_key('hello')
+# commiting a new version is simple
+>>> db.commit(new_version)
+# it returns whether the operation was successful
+True
+# the operation may fail if you try to commit a version that isn't based on the 
+# the current version.
+
+C interface
+===========
+
+TODO: document me!
+
+Internals
+=========
+
+TODO: document me!
+
+Current Progress
+================
+
+It is not yet suitable for production usage. There are a few known bugs in the 
+delete function and I'm going to be refactoring much of the code. I'm also 
+going to be starting a test suite soon. I consider it to be of (very early) 
+beta quality. 
+
+Reporting Bugs
+==============
+
+If you find a bug then please write a unit test (in Python if possible) that 
+fails and send it to me (Daniel) at Da.Waterworth@gmail.com .
+
+Thanks

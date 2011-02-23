@@ -51,9 +51,9 @@ class Version(object):
     
     def __getitem__(self, key):
         ptr = aodbm_lib.aodbm_get(self.db.db, self.version, str_to_data(key))
-        if ptr == None:
-            return None
-        return data_to_str(ptr.contents)
+        if ptr:
+            return data_to_str(ptr.contents)
+        raise KeyError()
     
     def __setitem__(self, key, val):
         key = str_to_data(key)
