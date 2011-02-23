@@ -1,7 +1,6 @@
 /* bool __sync_bool_compare_and_swap (type *ptr, type oldval, type newval) */
 /* TODO: add iteration api */
 /* TODO: better support for trees as values */
-/* TODO: make a function to get the previous tree */
 
 #ifndef AODBM
 #define AODBM
@@ -49,6 +48,7 @@ aodbm_version aodbm_set(aodbm *, aodbm_version, aodbm_data *, aodbm_data *);
 aodbm_data *aodbm_get(aodbm *, aodbm_version, aodbm_data *);
 aodbm_version aodbm_del(aodbm *, aodbm_version, aodbm_data *);
 bool aodbm_is_based_on(aodbm *, aodbm_version, aodbm_version);
+aodbm_version aodbm_previous_version(aodbm *, aodbm_version);
 
 /* NOTE: functions ending in di have destructive input */
 

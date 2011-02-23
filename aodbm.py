@@ -41,6 +41,9 @@ aodbm_lib.aodbm_del.restype = ctypes.c_uint64
 aodbm_lib.aodbm_data_lt.argtypes = [data_ptr, data_ptr]
 aodbm_lib.aodbm_data_lt.restype = ctypes.c_bool
 
+aodbm_lib.aodbm_previous_version.argtypes = [ctypes.c_void_p, ctypes.c_uint64]
+aodbm_lib.aodbm_previous_version.restype = ctypes.c_uint64
+
 class Version(object):
     def __init__(self, db, version):
         self.db = db
@@ -72,6 +75,9 @@ class Version(object):
         key = str_to_data(key)
         val = str_to_data(val)
         return Version(self.db, aodbm_lib.aodbm_set(self.db.db, self.version, key, val))
+
+    def previous(self):
+        return Version(self.db, aodbm_lib.aodbm_previous_version(self.db.db, self.version))
 
 class AODBM(object):
     def __init__(self, filename):

@@ -10,7 +10,7 @@ Getting Started
 
 $ make
 
-This will build a static and shared library.
+This will build a static and a shared library.
 
 Python interface
 ================
@@ -61,7 +61,14 @@ Current Progress
 It is not yet suitable for production usage. There are a few known bugs in the 
 delete function and I'm going to be refactoring much of the code. I'm also 
 going to be starting a test suite soon. I consider it to be of (very early) 
-beta quality. 
+beta quality.
+
+The goal of the project is to write a storage backend for a future DBMS. It 
+should therefore be:
+
+ * Fast,
+ * ACID compliant,
+ * As simple as possible.
 
 Reporting Bugs
 ==============

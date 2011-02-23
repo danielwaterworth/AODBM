@@ -821,5 +821,9 @@ bool aodbm_is_based_on(aodbm *db, aodbm_version a, aodbm_version b) {
     if (a == b) {
         return true;
     }
-    return aodbm_is_based_on(db, aodbm_read64(db, a), b);
+    return aodbm_is_based_on(db, aodbm_previous_version(db, a), b);
+}
+
+aodbm_version aodbm_previous_version(aodbm *db, aodbm_version ver) {
+    return aodbm_read64(db, ver);
 }
