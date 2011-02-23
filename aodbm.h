@@ -17,7 +17,6 @@
 */
 
 /* bool __sync_bool_compare_and_swap (type *ptr, type oldval, type newval) */
-/* TODO: add iteration api */
 /* TODO: better support for trees as values */
 
 #ifndef AODBM
@@ -53,6 +52,21 @@ aodbm_version aodbm_del(aodbm *, aodbm_version, aodbm_data *);
 
 bool aodbm_is_based_on(aodbm *, aodbm_version, aodbm_version);
 aodbm_version aodbm_previous_version(aodbm *, aodbm_version);
+
+/* iteration API */
+struct aodbm_iterator;
+typedef struct aodbm_iterator aodbm_iterator;
+
+struct aodbm_record {
+    aodbm_data *key;
+    aodbm_data *val;
+};
+
+typedef struct aodbm_record aodbm_record;
+
+aodbm_iterator *aodbm_new_iterator(aodbm *, aodbm_version);
+void aodbm_free_iterator(aodbm_iterator *);
+aodbm_record aodbm_iterator_next(aodbm *, aodbm_iterator *);
 
 void aodbm_free_data(aodbm_data *);
 

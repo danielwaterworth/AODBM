@@ -856,3 +856,20 @@ bool aodbm_is_based_on(aodbm *db, aodbm_version a, aodbm_version b) {
 aodbm_version aodbm_previous_version(aodbm *db, aodbm_version ver) {
     return aodbm_read64(db, ver);
 }
+
+struct aodbm_iterator {
+    aodbm_path *path;
+};
+
+aodbm_iterator *aodbm_new_iterator(aodbm *db, aodbm_version ver) {
+    /* create the path of the first record */
+}
+
+void aodbm_free_iterator(aodbm_iterator *it) {
+    aodbm_free_path(&it->path);
+    free(it);
+}
+
+aodbm_record aodbm_iterator_next(aodbm *db, aodbm_iterator *it) {
+    
+}

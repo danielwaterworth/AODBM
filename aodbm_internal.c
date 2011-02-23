@@ -362,3 +362,10 @@ aodbm_path *aodbm_search_path(aodbm *db, aodbm_version ver, aodbm_data *key) {
     aodbm_search_path_recursive(db, ver + 8, aodbm_data_empty(), key, &path);
     return path;
 }
+
+void aodbm_free_path(aodbm_path **path) {
+    while (*path != NULL) {
+        aodbm_path_node node = aodbm_path_pop(path);
+        aodbm_free_data(node.key);
+    }
+}

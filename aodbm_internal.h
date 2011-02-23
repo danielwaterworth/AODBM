@@ -75,6 +75,7 @@ typedef struct aodbm_path aodbm_path;
 void aodbm_path_push(aodbm_path **, aodbm_path_node);
 aodbm_path_node aodbm_path_pop(aodbm_path **);
 void aodbm_path_print(aodbm_path *);
+void aodbm_free_path(aodbm_path **);
 
 aodbm_path *aodbm_search_path(aodbm *, aodbm_version, aodbm_data *);
 
