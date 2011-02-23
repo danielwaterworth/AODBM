@@ -652,7 +652,10 @@ aodbm_version aodbm_del(aodbm *db, aodbm_version ver, aodbm_data *key) {
     aodbm_read(db, ver + 8, 1, &type);
     if (type == 'l') {
         remove_result res = remove_from_leaf(db, key, ver + 9);
-        aodbm_free_data(res.key);
+        if (res.key != NULL) {
+            /* empty leaves don't have a key */
+            aodbm_free_data(res.key);
+        }
         
         aodbm_rope_prepend_di(root, res.data);
         
