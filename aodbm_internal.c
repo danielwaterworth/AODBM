@@ -117,8 +117,12 @@ void aodbm_write_bytes(aodbm *db, void *ptr, size_t sz) {
         perror("aodbm");
         exit(1);
     }
+    db->file_size += sz;
     #else
-    fwrite(ptr, 1, sz, db->fd);
+    if (fwrite(ptr, 1, sz, db->fd) != sz) {
+        perror("aodbm");
+        exit(1);
+    }
     #endif
 }
 
@@ -142,20 +146,26 @@ void aodbm_write_version(aodbm *db, uint64_t ver) {
 
 void aodbm_read(aodbm *db, uint64_t off, size_t sz, void *ptr) {
     #ifdef AODBM_USE_MMAP
-    size_t map_sz;
     long page_size = sysconf(_SC_PAGE_SIZE);
-    if (sz % page_size == 0) {
-        map_sz = sz;
-    } else {
-        map_sz = sz - (sz % page_size) + page_size;
+    
+    uint64_t start, end;
+    start = off - (off % page_size);
+    end = off + sz;
+    
+    if (end % page_size != 0) {
+        end = end - (end % page_size) + page_size;
     }
-    if (off + (uint64_t)map_sz < aodbm_file_size(db)) {
-        void *mapping = mmap(NULL, map_sz, PROT_READ, MAP_SHARED, db->fd, off);
+    
+    size_t map_sz = end - start;
+    
+    if (end < aodbm_file_size(db)) {
+        void *mapping =
+            mmap(NULL, map_sz, PROT_READ, MAP_SHARED, db->fd, start);
         if (mapping == MAP_FAILED) {
-            printf("failed to create mapping\n");
+            perror("aodbm");
             exit(1);
         }
-        memcpy(ptr, mapping, sz);
+        memcpy(ptr, mapping + (off - start), sz);
         munmap(mapping, map_sz);
     } else {
         pthread_mutex_lock(&db->rw);

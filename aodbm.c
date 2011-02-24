@@ -31,6 +31,7 @@ aodbm *aodbm_open(const char *filename) {
         printf("couldn't open file\n");
         exit(1);
     }
+    ptr->file_size = 0;
     #else
     ptr->fd = fopen(filename, "a+b");
     if (ptr->fd == NULL) {
@@ -55,6 +56,7 @@ aodbm *aodbm_open(const char *filename) {
         if (!aodbm_read_bytes(ptr, &type, 1)) {
             break;
         }
+        ptr->file_size += 1;
         if (type == 'v') {
             /* update version */
             uint64_t ver;
@@ -64,6 +66,7 @@ aodbm *aodbm_open(const char *filename) {
                 exit(1);
             }
             ptr->cur = ntohll(ver);
+            ptr->file_size += 8;
         } else if (type == 'd') {
             /* traverse data */
             uint32_t sz;
@@ -72,12 +75,14 @@ aodbm *aodbm_open(const char *filename) {
                 printf("error, unexpected EOF whilst reading a data block\n");
                 exit(1);
             }
+            ptr->file_size += 4;
             sz = ntohl(sz);
             if (!aodbm_seek(ptr, sz, SEEK_CUR)) {
                 /* TODO: check for EOF, truncate file */
                 printf("error, cannot seek\n");
                 exit(1);
             }
+            ptr->file_size += sz;
         } else {
             printf("error, unknown block type\n");
             exit(1);
@@ -99,12 +104,16 @@ void aodbm_close(aodbm *db) {
 }
 
 uint64_t aodbm_file_size(aodbm *db) {
+    #ifdef AODBM_USE_MMAP
+    return db->file_size;
+    #else
     uint64_t pos;
     pthread_mutex_lock(&db->rw);
     aodbm_seek(db, 0, SEEK_END);
     pos = aodbm_tell(db);
     pthread_mutex_unlock(&db->rw);
     return pos;
+    #endif
 }
 
 uint64_t aodbm_current(aodbm *db) {
