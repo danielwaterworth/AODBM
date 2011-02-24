@@ -90,7 +90,7 @@ class Version(object):
     
     def is_based_on(self, other):
         '''Is this object based on other?'''
-        assert self.db = other.db
+        assert self.db == other.db
         return aodbm_lib.aodbm_is_based_on(self.db.db, self.version, other.version)
 
 class AODBM(object):
