@@ -8,6 +8,9 @@ struct aodbm {
     pthread_mutex_t rw;
     volatile uint64_t cur;
     pthread_mutex_t version;
+    #ifdef AODBM_USE_MMAP
+    int mmap_fd;
+    #endif
 };
 
 void print_hex(unsigned char);

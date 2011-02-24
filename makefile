@@ -1,6 +1,6 @@
 srcs = aodbm.c aodbm_data.c aodbm_rope.c aodbm_internal.c
 objs = aodbm.o aodbm_data.o aodbm_rope.o aodbm_internal.o
-flags = -g
+flags = -g -DAODBM_USE_MMAP
 
 all:
 	gcc ${srcs} -fPIC -c -I./ -D_GNU_SOURCE ${flags}

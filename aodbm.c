@@ -15,12 +15,19 @@
     ntohl( ((uint32_t)(x >> 32)) ) )                                        
 #define htonll(x) ntohll(x)
 
+#ifdef AODBM_USE_MMAP
+#include <fcntl.h>
+#endif
+
 #include "aodbm.h"
 #include "aodbm_internal.h"
 
 aodbm *aodbm_open(const char *filename) {
     aodbm *ptr = malloc(sizeof(aodbm));
     ptr->fd = fopen(filename, "a+b");
+    #ifdef AODBM_USE_MMAP
+    ptr->mmap_fd = open(filename, O_RDONLY);
+    #endif
     
     pthread_mutexattr_t rec;
     pthread_mutexattr_init(&rec);
@@ -71,6 +78,9 @@ aodbm *aodbm_open(const char *filename) {
 
 void aodbm_close(aodbm *db) {
     fclose(db->fd);
+    #ifdef AODBM_USE_MMAP
+    close(db->mmap_fd);
+    #endif
     pthread_mutex_destroy(&db->rw);
     pthread_mutex_destroy(&db->version);
     free(db);

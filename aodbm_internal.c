@@ -1,6 +1,7 @@
 #include "stdio.h"
 #include "stdlib.h"
 #include "assert.h"
+#include "string.h"
 
 #include "aodbm_internal.h"
 
@@ -9,6 +10,11 @@
 #define ntohll(x) ( ( (uint64_t)(ntohl( (uint32_t)((x << 32) >> 32) )) << 32) |\
     ntohl( ((uint32_t)(x >> 32)) ) )                                        
 #define htonll(x) ntohll(x)
+
+#ifdef AODBM_USE_MMAP
+#include <sys/mman.h>
+#include <unistd.h>
+#endif
 
 void print_hex(unsigned char c) {
     printf("\\x%.2x", c);
@@ -96,7 +102,22 @@ void aodbm_write_version(aodbm *db, uint64_t ver) {
 }
 
 void aodbm_read(aodbm *db, uint64_t off, size_t sz, void *ptr) {
-    /* TODO: modify to use mmap */
+    #ifdef AODBM_USE_MMAP
+    size_t map_sz;
+    long page_size = sysconf(_SC_PAGE_SIZE);
+    if (sz % page_size == 0) {
+        map_sz = sz;
+    } else {
+        map_sz = sz - (sz % page_size) + page_size;
+    }
+    void *mapping = mmap(NULL, map_sz, PROT_READ, MAP_SHARED, db->mmap_fd, off);
+    if (mapping == MAP_FAILED) {
+        printf("failed\n");
+        exit(1);
+    }
+    memcpy(ptr, mapping, sz);
+    munmap(mapping, map_sz);
+    #else
     pthread_mutex_lock(&db->rw);
     fseek(db->fd, off, SEEK_SET);
     if (fread(ptr, 1, sz, db->fd) != sz) {
@@ -105,6 +126,7 @@ void aodbm_read(aodbm *db, uint64_t off, size_t sz, void *ptr) {
         exit(1);
     }
     pthread_mutex_unlock(&db->rw);
+    #endif
 }
 
 uint32_t aodbm_read32(aodbm *db, uint64_t off) {
