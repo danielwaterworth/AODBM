@@ -15,8 +15,6 @@
 #include <unistd.h>
 #include <fcntl.h>
 
-#include <sys/types.h>
-#include <sys/stat.h>
 #include <sys/mman.h>
 #endif
 
@@ -88,56 +86,31 @@ aodbm_rope *make_record_di(aodbm_data *key, aodbm_data *val) {
 }
 
 bool aodbm_read_bytes(aodbm *db, void *ptr, size_t sz) {
-    #ifdef AODBM_USE_MMAP
-    return read(db->fd, ptr, sz) == sz;
-    #else
     return fread(ptr, 1, sz, db->fd) == sz;
-    #endif
 }
 
 bool aodbm_seek(aodbm *db, size_t off, int startpoint) {
-    #ifdef AODBM_USE_MMAP
-    return lseek(db->fd, off, startpoint) > 0;
-    #else
     return fseek(db->fd, off, startpoint) == 0;
-    #endif
 }
 
 uint64_t aodbm_tell(aodbm *db) {
-    #ifdef AODBM_USE_MMAP
-    return lseek(db->fd, 0, SEEK_CUR);
-    #else
     return ftell(db->fd);
-    #endif
 }
 
 void aodbm_write_bytes(aodbm *db, void *ptr, size_t sz) {
-    #ifdef AODBM_USE_MMAP
-    if (write(db->fd, ptr, sz) < 0) {
-        perror("aodbm");
-        exit(1);
-    }
     db->file_size += sz;
-    #else
     if (fwrite(ptr, 1, sz, db->fd) != sz) {
         perror("aodbm");
         exit(1);
     }
-    #endif
 }
 
 void aodbm_truncate(aodbm *db, uint64_t sz) {
-    #ifdef AODBM_USE_MMAP
-    if (ftruncate(db->fd, sz) != 0) {
+    if (ftruncate(fileno(db->fd), sz) != 0) {
         printf("error truncating\n");
         exit(1);
     }
-    #else
-    if (ftruncate(fileno(db->db), sz) != 0) {
-        printf("error truncating\n");
-        exit(1);
-    }
-    #endif
+    db->file_size = sz;
 }
 
 void aodbm_write_data_block(aodbm *db, aodbm_data *data) {
@@ -147,9 +120,7 @@ void aodbm_write_data_block(aodbm *db, aodbm_data *data) {
     uint32_t sz = htonl(data->sz);
     aodbm_write_bytes(db, &sz, 4);
     aodbm_write_bytes(db, data->dat, data->sz);
-    #ifndef AODBM_USE_AODBM
     fflush(db->fd);
-    #endif
     pthread_mutex_unlock(&db->rw);
 }
 
@@ -158,9 +129,7 @@ void aodbm_write_version(aodbm *db, uint64_t ver) {
     aodbm_write_bytes(db, "v", 1);
     uint64_t off = htonll(ver);
     aodbm_write_bytes(db, &off, 8);
-    #ifndef AODBM_USE_AODBM
     fflush(db->fd);
-    #endif
     pthread_mutex_unlock(&db->rw);
 }
 
@@ -180,7 +149,7 @@ void aodbm_read(aodbm *db, uint64_t off, size_t sz, void *ptr) {
     
     if (end < aodbm_file_size(db)) {
         void *mapping =
-            mmap(NULL, map_sz, PROT_READ, MAP_SHARED, db->fd, start);
+            mmap(NULL, map_sz, PROT_READ, MAP_SHARED, fileno(db->fd), start);
         if (mapping == MAP_FAILED) {
             perror("aodbm");
             exit(1);
@@ -196,11 +165,7 @@ void aodbm_read(aodbm *db, uint64_t off, size_t sz, void *ptr) {
     #else
     pthread_mutex_lock(&db->rw);
     aodbm_seek(db, off, SEEK_SET);
-    if (fread(ptr, 1, sz, db->fd) != sz) {
-        printf("unexpected EOF\n");
-        assert(0);
-        exit(1);
-    }
+    aodbm_read_bytes(db, ptr, sz);
     pthread_mutex_unlock(&db->rw);
     #endif
 }

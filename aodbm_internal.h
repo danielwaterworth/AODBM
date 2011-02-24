@@ -4,12 +4,8 @@
 #include "aodbm.h"
 
 struct aodbm {
-    #ifdef AODBM_USE_MMAP
-    int fd;
     uint64_t file_size;
-    #else
     FILE *fd;
-    #endif
     pthread_mutex_t rw;
     volatile uint64_t cur;
     pthread_mutex_t version;

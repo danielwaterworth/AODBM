@@ -25,20 +25,12 @@
 
 aodbm *aodbm_open(const char *filename) {
     aodbm *ptr = malloc(sizeof(aodbm));
-    #ifdef AODBM_USE_MMAP
-    ptr->fd = open(filename, O_RDWR|O_APPEND|O_CREAT|O_FSYNC, 0644);
-    if (ptr->fd < 0) {
-        printf("couldn't open file\n");
-        exit(1);
-    }
     ptr->file_size = 0;
-    #else
     ptr->fd = fopen(filename, "a+b");
     if (ptr->fd == NULL) {
         printf("couldn't open file\n");
         exit(1);
     }
-    #endif
     
     pthread_mutexattr_t rec;
     pthread_mutexattr_init(&rec);
@@ -93,27 +85,14 @@ aodbm *aodbm_open(const char *filename) {
 }
 
 void aodbm_close(aodbm *db) {
-    #ifdef AODBM_USE_MMAP
-    close(db->fd);
-    #else
     fclose(db->fd);
-    #endif
     pthread_mutex_destroy(&db->rw);
     pthread_mutex_destroy(&db->version);
     free(db);
 }
 
 uint64_t aodbm_file_size(aodbm *db) {
-    #ifdef AODBM_USE_MMAP
     return db->file_size;
-    #else
-    uint64_t pos;
-    pthread_mutex_lock(&db->rw);
-    aodbm_seek(db, 0, SEEK_END);
-    pos = aodbm_tell(db);
-    pthread_mutex_unlock(&db->rw);
-    return pos;
-    #endif
 }
 
 uint64_t aodbm_current(aodbm *db) {
