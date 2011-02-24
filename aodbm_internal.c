@@ -12,8 +12,12 @@
 #define htonll(x) ntohll(x)
 
 #ifdef AODBM_USE_MMAP
-#include <sys/mman.h>
 #include <unistd.h>
+#include <fcntl.h>
+
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/mman.h>
 #endif
 
 void print_hex(unsigned char c) {
@@ -83,21 +87,56 @@ aodbm_rope *make_record_di(aodbm_data *key, aodbm_data *val) {
     return aodbm_rope_merge_di(make_block_di(key), make_block_di(val));
 }
 
+bool aodbm_read_bytes(aodbm *db, void *ptr, size_t sz) {
+    #ifdef AODBM_USE_MMAP
+    return read(db->fd, ptr, sz) == sz;
+    #else
+    return fread(ptr, 1, sz, db->fd) == sz;
+    #endif
+}
+
+bool aodbm_seek(aodbm *db, size_t off, int startpoint) {
+    #ifdef AODBM_USE_MMAP
+    return lseek(db->fd, off, startpoint) > 0;
+    #else
+    return fseek(db->fd, off, startpoint) == 0;
+    #endif
+}
+
+uint64_t aodbm_tell(aodbm *db) {
+    #ifdef AODBM_USE_MMAP
+    return lseek(db->fd, 0, SEEK_CUR);
+    #else
+    return ftell(db->fd);
+    #endif
+}
+
+void aodbm_write_bytes(aodbm *db, void *ptr, size_t sz) {
+    #ifdef AODBM_USE_MMAP
+    if (write(db->fd, ptr, sz) < 0) {
+        perror("aodbm");
+        exit(1);
+    }
+    #else
+    fwrite(ptr, 1, sz, db->fd);
+    #endif
+}
+
 void aodbm_write_data_block(aodbm *db, aodbm_data *data) {
     pthread_mutex_lock(&db->rw);
-    fwrite("d", 1, 1, db->fd);
+    aodbm_write_bytes(db, "d", 1);
     /* ensure size fits in 32bits */
     uint32_t sz = htonl(data->sz);
-    fwrite(&sz, 1, 4, db->fd);
-    fwrite(data->dat, 1, data->sz, db->fd);
+    aodbm_write_bytes(db, &sz, 4);
+    aodbm_write_bytes(db, data->dat, data->sz);
     pthread_mutex_unlock(&db->rw);
 }
 
 void aodbm_write_version(aodbm *db, uint64_t ver) {
     pthread_mutex_lock(&db->rw);
-    fwrite("v", 1, 1, db->fd);
+    aodbm_write_bytes(db, "v", 1);
     uint64_t off = htonll(ver);
-    fwrite(&off, 1, 8, db->fd);
+    aodbm_write_bytes(db, &off, 8);
     pthread_mutex_unlock(&db->rw);
 }
 
@@ -110,16 +149,23 @@ void aodbm_read(aodbm *db, uint64_t off, size_t sz, void *ptr) {
     } else {
         map_sz = sz - (sz % page_size) + page_size;
     }
-    void *mapping = mmap(NULL, map_sz, PROT_READ, MAP_SHARED, db->mmap_fd, off);
-    if (mapping == MAP_FAILED) {
-        printf("failed\n");
-        exit(1);
+    if (off + (uint64_t)map_sz < aodbm_file_size(db)) {
+        void *mapping = mmap(NULL, map_sz, PROT_READ, MAP_SHARED, db->fd, off);
+        if (mapping == MAP_FAILED) {
+            printf("failed to create mapping\n");
+            exit(1);
+        }
+        memcpy(ptr, mapping, sz);
+        munmap(mapping, map_sz);
+    } else {
+        pthread_mutex_lock(&db->rw);
+        aodbm_seek(db, off, SEEK_SET);
+        aodbm_read_bytes(db, ptr, sz);
+        pthread_mutex_unlock(&db->rw);
     }
-    memcpy(ptr, mapping, sz);
-    munmap(mapping, map_sz);
     #else
     pthread_mutex_lock(&db->rw);
-    fseek(db->fd, off, SEEK_SET);
+    aodbm_seek(db, off, SEEK_SET);
     if (fread(ptr, 1, sz, db->fd) != sz) {
         printf("unexpected EOF\n");
         assert(0);

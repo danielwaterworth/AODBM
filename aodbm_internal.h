@@ -4,13 +4,14 @@
 #include "aodbm.h"
 
 struct aodbm {
+    #ifdef AODBM_USE_MMAP
+    int fd;
+    #else
     FILE *fd;
+    #endif
     pthread_mutex_t rw;
     volatile uint64_t cur;
     pthread_mutex_t version;
-    #ifdef AODBM_USE_MMAP
-    int mmap_fd;
-    #endif
 };
 
 void print_hex(unsigned char);
@@ -21,6 +22,11 @@ aodbm_rope *make_block(aodbm_data *);
 aodbm_rope *make_block_di(aodbm_data *);
 aodbm_rope *make_record(aodbm_data *, aodbm_data *);
 aodbm_rope *make_record_di(aodbm_data *, aodbm_data *);
+
+bool aodbm_read_bytes(aodbm *, void *, size_t);
+bool aodbm_seek(aodbm *, size_t, int);
+uint64_t aodbm_tell(aodbm *);
+void aodbm_write_bytes(aodbm *, void *, size_t);
 
 void aodbm_write_data_block(aodbm *db, aodbm_data *data);
 void aodbm_write_version(aodbm *db, uint64_t ver);

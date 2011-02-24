@@ -16,6 +16,7 @@
 #define htonll(x) ntohll(x)
 
 #ifdef AODBM_USE_MMAP
+#include <unistd.h>
 #include <fcntl.h>
 #endif
 
@@ -24,9 +25,18 @@
 
 aodbm *aodbm_open(const char *filename) {
     aodbm *ptr = malloc(sizeof(aodbm));
-    ptr->fd = fopen(filename, "a+b");
     #ifdef AODBM_USE_MMAP
-    ptr->mmap_fd = open(filename, O_RDONLY);
+    ptr->fd = open(filename, O_RDWR|O_APPEND|O_CREAT|O_FSYNC, 0644);
+    if (ptr->fd < 0) {
+        printf("couldn't open file\n");
+        exit(1);
+    }
+    #else
+    ptr->fd = fopen(filename, "a+b");
+    if (ptr->fd == NULL) {
+        printf("couldn't open file\n");
+        exit(1);
+    }
     #endif
     
     pthread_mutexattr_t rec;
@@ -38,18 +48,18 @@ aodbm *aodbm_open(const char *filename) {
     
     pthread_mutexattr_destroy(&rec);
     
-    fseek(ptr->fd, 0, SEEK_SET);
+    aodbm_seek(ptr, 0, SEEK_SET);
     ptr->cur = 0;
     while(1) {
         char type;
-        size_t n = fread(&type, 1, 1, ptr->fd);
-        if (n != 1) {
+        if (!aodbm_read_bytes(ptr, &type, 1)) {
             break;
         }
         if (type == 'v') {
             /* update version */
             uint64_t ver;
-            if (fread(&ver, 1, 8, ptr->fd) != 8) {
+            if (!aodbm_read_bytes(ptr, &ver, 8)) {
+                /* TODO: modify to truncate */
                 printf("error, unexpected EOF whilst reading a version\n");
                 exit(1);
             }
@@ -57,12 +67,13 @@ aodbm *aodbm_open(const char *filename) {
         } else if (type == 'd') {
             /* traverse data */
             uint32_t sz;
-            if (fread(&sz, 1, 4, ptr->fd) != 4) {
+            if (!aodbm_read_bytes(ptr, &sz, 4)) {
+                /* TODO: modify to truncate */
                 printf("error, unexpected EOF whilst reading a data block\n");
                 exit(1);
             }
             sz = ntohl(sz);
-            if (fseek(ptr->fd, sz, SEEK_CUR) != 0) {
+            if (!aodbm_seek(ptr, sz, SEEK_CUR)) {
                 /* TODO: check for EOF, truncate file */
                 printf("error, cannot seek\n");
                 exit(1);
@@ -77,9 +88,10 @@ aodbm *aodbm_open(const char *filename) {
 }
 
 void aodbm_close(aodbm *db) {
-    fclose(db->fd);
     #ifdef AODBM_USE_MMAP
-    close(db->mmap_fd);
+    close(db->fd);
+    #else
+    fclose(db->fd);
     #endif
     pthread_mutex_destroy(&db->rw);
     pthread_mutex_destroy(&db->version);
@@ -89,8 +101,8 @@ void aodbm_close(aodbm *db) {
 uint64_t aodbm_file_size(aodbm *db) {
     uint64_t pos;
     pthread_mutex_lock(&db->rw);
-    fseek(db->fd, 0, SEEK_END);
-    pos = ftell(db->fd);
+    aodbm_seek(db, 0, SEEK_END);
+    pos = aodbm_tell(db);
     pthread_mutex_unlock(&db->rw);
     return pos;
 }
