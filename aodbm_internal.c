@@ -126,6 +126,20 @@ void aodbm_write_bytes(aodbm *db, void *ptr, size_t sz) {
     #endif
 }
 
+void aodbm_truncate(aodbm *db, uint64_t sz) {
+    #ifdef AODBM_USE_MMAP
+    if (ftruncate(db->fd, sz) != 0) {
+        printf("error truncating\n");
+        exit(1);
+    }
+    #else
+    if (ftruncate(fileno(db->db), sz) != 0) {
+        printf("error truncating\n");
+        exit(1);
+    }
+    #endif
+}
+
 void aodbm_write_data_block(aodbm *db, aodbm_data *data) {
     pthread_mutex_lock(&db->rw);
     aodbm_write_bytes(db, "d", 1);
@@ -133,6 +147,9 @@ void aodbm_write_data_block(aodbm *db, aodbm_data *data) {
     uint32_t sz = htonl(data->sz);
     aodbm_write_bytes(db, &sz, 4);
     aodbm_write_bytes(db, data->dat, data->sz);
+    #ifndef AODBM_USE_AODBM
+    fflush(db->fd);
+    #endif
     pthread_mutex_unlock(&db->rw);
 }
 
@@ -141,6 +158,9 @@ void aodbm_write_version(aodbm *db, uint64_t ver) {
     aodbm_write_bytes(db, "v", 1);
     uint64_t off = htonll(ver);
     aodbm_write_bytes(db, &off, 8);
+    #ifndef AODBM_USE_AODBM
+    fflush(db->fd);
+    #endif
     pthread_mutex_unlock(&db->rw);
 }
 

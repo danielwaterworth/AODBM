@@ -28,6 +28,7 @@ bool aodbm_read_bytes(aodbm *, void *, size_t);
 bool aodbm_seek(aodbm *, size_t, int);
 uint64_t aodbm_tell(aodbm *);
 void aodbm_write_bytes(aodbm *, void *, size_t);
+void aodbm_truncate(aodbm *, uint64_t);
 
 void aodbm_write_data_block(aodbm *db, aodbm_data *data);
 void aodbm_write_version(aodbm *db, uint64_t ver);
