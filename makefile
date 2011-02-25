@@ -7,4 +7,3 @@ all:
 	rm libaodbm.a
 	ar -cq libaodbm.a ${objs}
 	gcc ${objs} -shared -o libaodbm.so ${flags}
-	gcc aodbm_test.c libaodbm.a -o aodbm_test -I./ -lpthread ${flags} 
