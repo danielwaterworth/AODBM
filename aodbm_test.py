@@ -16,23 +16,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 '''
 
-import aodbm, random
+import unittest, tests
 
-#n = 10000
-
-db = aodbm.AODBM("testdb")
-ver = db.current_version()
-ver['test'] = 'hello'
-assert ver['test'] == 'hello'
-
-#ver = db.current_version()
-#l = range(n)
-#random.shuffle(l)
-#for i in l:
-#    ver['~' + str(i) + '~'] = 'world' + str(i)
-#print ver.version
-#print "written"
-#ver = aodbm.Version(db, 4575053)
-#for i in xrange(n):
-#    assert ver['~' + str(i) + '~'] == 'world' + str(i)
-
+if __name__ == '__main__':
+    unittest.TextTestRunner().run(tests.tests)
