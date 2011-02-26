@@ -285,10 +285,10 @@ typedef struct {
     aodbm_data *a_key;
     aodbm_rope *b_node;
     aodbm_data *b_key;
-} insert_result;
+} modify_result;
 
 /* pos is positioned just after the type byte */
-insert_result insert_into_leaf(aodbm *db,
+modify_result insert_into_leaf(aodbm *db,
                                aodbm_data *key,
                                aodbm_data *val,
                                uint64_t pos) {
@@ -311,14 +311,14 @@ insert_result insert_into_leaf(aodbm *db,
                                                    MAX_NODE_SIZE/2,
                                                    true));
         }
-        insert_result result;
+        modify_result result;
         result.a_node = a_range.node;
         result.a_key = a_range.key;
         result.b_node = b_range.node;
         result.b_key = b_range.key;
         return result;
     } else if (sz == 0) {
-        insert_result result;
+        modify_result result;
         result.a_node = aodbm_data2_to_rope_di(aodbm_data_from_str("l"),
                                                aodbm_data_from_32(1));
         result.a_node = aodbm_rope_merge_di(result.a_node,
@@ -330,7 +330,7 @@ insert_result insert_into_leaf(aodbm *db,
     } else if (sz < MAX_NODE_SIZE) {
         range_result range =
             add_header(insert_into_leaf_range(db, key, val, pos, sz, true));
-        insert_result result;
+        modify_result result;
         result.a_node = range.node;
         result.a_key = range.key;
         result.b_node = NULL;
@@ -342,16 +342,13 @@ insert_result insert_into_leaf(aodbm *db,
     }
 }
 
-typedef struct {
-    aodbm_rope *data;
-    aodbm_data *key;
-} remove_result;
-
-remove_result remove_from_leaf(aodbm *db,
+modify_result remove_from_leaf(aodbm *db,
                                aodbm_data *key,
                                uint64_t pos) {
-    remove_result result;
-    result.key = NULL;
+    modify_result result;
+    result.a_key = NULL;
+    result.b_key = NULL;
+    result.b_node = NULL;
     aodbm_rope *data = aodbm_rope_empty();
     uint32_t sz = aodbm_read32(db, pos);
     pos += 4;
@@ -366,8 +363,8 @@ remove_result remove_from_leaf(aodbm *db,
         
         if (!removed) {
             if (!aodbm_data_eq(r_key, key)) {
-                if (result.key == NULL) {
-                    result.key = aodbm_data_dup(r_key);
+                if (result.a_key == NULL) {
+                    result.a_key = aodbm_data_dup(r_key);
                 }
                 data = aodbm_rope_merge_di(data, make_record_di(r_key, r_val));
             } else {
@@ -376,8 +373,8 @@ remove_result remove_from_leaf(aodbm *db,
                 aodbm_free_data(r_val);
             }
         } else {
-            if (result.key == NULL) {
-                result.key = aodbm_data_dup(r_key);
+            if (result.a_key == NULL) {
+                result.a_key = aodbm_data_dup(r_key);
             }
             data = aodbm_rope_merge_di(data, make_record_di(r_key, r_val));
         }
@@ -388,7 +385,7 @@ remove_result remove_from_leaf(aodbm *db,
                                aodbm_data_from_32(sz - (removed?1:0)));
     data = aodbm_rope_merge_di(header, data);
     
-    result.data = data;
+    result.a_node = data;
     return result;
 }
 
@@ -448,14 +445,15 @@ aodbm_rope *branch_to_rope(branch *br) {
     return aodbm_rope_merge_di(header, br->data);
 }
 
-insert_result insert_into_branch(aodbm *db,
-                                 uint64_t node,
-                                 aodbm_data *node_key,
-                                 uint64_t node_a,
-                                 aodbm_data *a_key,
-                                 uint64_t node_b,
-                                 aodbm_data *b_key,
-                                 uint64_t rm) {
+modify_result modify_branch(aodbm *db,
+                            uint64_t node,
+                            aodbm_data *node_key,
+                            uint64_t node_a,
+                            aodbm_data *a_key,
+                            uint64_t node_b,
+                            aodbm_data *b_key,
+                            uint64_t rm_a,
+                            uint64_t rm_b) {
     branch a, b;
     branch_init(&a);
     branch_init(&b);
@@ -471,7 +469,7 @@ insert_result insert_into_branch(aodbm *db,
     bool a_placed = false;
     bool b_placed = b_key == NULL;
     
-    if (off != rm) {
+    if (off != rm_a && off != rm_b) {
         add_to_branches(&a, &b, node_key, off);
     }
     
@@ -501,7 +499,7 @@ insert_result insert_into_branch(aodbm *db,
             }
         }
         
-        if (off != rm) {
+        if (off != rm_a && off != rm_b) {
             add_to_branches_di(&a, &b, key, off);
         }
     }
@@ -513,7 +511,7 @@ insert_result insert_into_branch(aodbm *db,
         add_to_branches(&a, &b, b_key, node_b);
     }
     
-    insert_result result;
+    modify_result result;
     if (b.sz + 1 < MAX_NODE_SIZE/2) {
         merge_branches(&a, &b);
         result.a_node = branch_to_rope(&a);
@@ -551,7 +549,7 @@ aodbm_version aodbm_set(aodbm *db,
         char type;
         aodbm_read(db, ver + 8, 1, &type);
         if (type == 'l') {
-            insert_result leaf = insert_into_leaf(db, key, val, ver + 9);
+            modify_result leaf = insert_into_leaf(db, key, val, ver + 9);
             aodbm_free_data(leaf.a_key);
             if (leaf.b_node == NULL) {
                 aodbm_rope *data = leaf.a_node;
@@ -580,7 +578,7 @@ aodbm_version aodbm_set(aodbm *db,
             aodbm_path *path = aodbm_search_path(db, ver, key);
             /* pop the leaf node */
             aodbm_path_node node = aodbm_path_pop(&path);
-            insert_result nodes = insert_into_leaf(db, key, val, node.node + 1);
+            modify_result nodes = insert_into_leaf(db, key, val, node.node + 1);
             uint64_t prev_node = node.node;
             
             uint64_t a, b;
@@ -602,14 +600,15 @@ aodbm_version aodbm_set(aodbm *db,
                     data_sz += b_sz;
                 }
                 
-                nodes = insert_into_branch(db,
-                                           node.node,
-                                           node.key,
-                                           a,
-                                           nodes.a_key,
-                                           b,
-                                           nodes.b_key,
-                                           prev_node);
+                nodes = modify_branch(db,
+                                      node.node,
+                                      node.key,
+                                      a,
+                                      nodes.a_key,
+                                      b,
+                                      nodes.b_key,
+                                      prev_node,
+                                      0);
                 aodbm_free_data(node.key);
                 
                 prev_node = node.node;
@@ -681,15 +680,15 @@ aodbm_version aodbm_del(aodbm *db, aodbm_version ver, aodbm_data *key) {
     char type;
     aodbm_read(db, ver + 8, 1, &type);
     if (type == 'l') {
-        remove_result res = remove_from_leaf(db, key, ver + 9);
-        if (res.key != NULL) {
+        modify_result res = remove_from_leaf(db, key, ver + 9);
+        if (res.a_key != NULL) {
             /* empty leaves don't have a key */
-            aodbm_free_data(res.key);
+            aodbm_free_data(res.a_key);
         }
         
-        aodbm_rope_prepend_di(root, res.data);
+        aodbm_rope_prepend_di(root, res.a_node);
         
-        append = aodbm_rope_to_data_di(res.data);
+        append = aodbm_rope_to_data_di(res.a_node);
         result = append_pos;
     } else if (type == 'b') {
         /* TODO: modify to merge nodes */
@@ -699,9 +698,7 @@ aodbm_version aodbm_del(aodbm *db, aodbm_version ver, aodbm_data *key) {
         
         /* pop the leaf node */
         aodbm_path_node node = aodbm_path_pop(&path);
-        remove_result leaf = remove_from_leaf(db, key, node.node + 1);
-        /* XXX: this is a hack, TODO: clean up the code that modifies nodes */
-        insert_result nodes = { leaf.data, leaf.key, NULL, NULL };
+        modify_result nodes = remove_from_leaf(db, key, node.node + 1);
         uint64_t prev_node = node.node;
         
         uint64_t a, b;
@@ -723,20 +720,22 @@ aodbm_version aodbm_del(aodbm *db, aodbm_version ver, aodbm_data *key) {
                 data_sz += b_sz;
             }
         
-            nodes = insert_into_branch(db,
-                                       node.node,
-                                       node.key,
-                                       a,
-                                       nodes.a_key,
-                                       b,
-                                       nodes.b_key,
-                                       prev_node);
+            nodes = modify_branch(db,
+                                  node.node,
+                                  node.key,
+                                  a,
+                                  nodes.a_key,
+                                  b,
+                                  nodes.b_key,
+                                  prev_node,
+                                  0);
             aodbm_free_data(node.key);
             
             prev_node = node.node;
         }
         
         aodbm_free_data(nodes.a_key);
+        /* TODO: write a function to construct root nodes */
         if (nodes.b_key == NULL) {
             aodbm_rope_prepend_di(root, nodes.a_node);
             
