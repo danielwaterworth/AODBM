@@ -104,11 +104,21 @@ aodbm_rope *make_record_di(aodbm_data *key, aodbm_data *val) {
 }
 
 bool aodbm_read_bytes(aodbm *db, void *ptr, size_t sz) {
-    return fread(ptr, 1, sz, db->fd) == sz;
+    if (fread(ptr, 1, sz, db->fd) != sz) {
+        if (feof(db->fd)) {
+            return false;
+        }
+        perror("aodbm");
+        exit(1);
+    }
+    return true;
 }
 
-bool aodbm_seek(aodbm *db, int64_t off, int startpoint) {
-    return fseeko(db->fd, off, startpoint) == 0;
+void aodbm_seek(aodbm *db, int64_t off, int startpoint) {
+    if (fseeko(db->fd, off, startpoint) != 0) {
+        perror("aodbm");
+        exit(1);
+    }
 }
 
 uint64_t aodbm_tell(aodbm *db) {
@@ -125,7 +135,7 @@ void aodbm_write_bytes(aodbm *db, void *ptr, size_t sz) {
 
 void aodbm_truncate(aodbm *db, uint64_t sz) {
     if (ftruncate(fileno(db->fd), sz) != 0) {
-        printf("error truncating\n");
+        perror("aodbm");
         exit(1);
     }
     db->file_size = sz;

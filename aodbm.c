@@ -59,10 +59,14 @@ aodbm *aodbm_open(const char *filename) {
     
     pthread_mutexattr_destroy(&rec);
     
+    aodbm_seek(ptr, 0, SEEK_END);
+    uint64_t actual_size = aodbm_tell(ptr);
+    
     aodbm_seek(ptr, 0, SEEK_SET);
     ptr->cur = 0;
     while(1) {
         char type;
+        uint64_t block_begin = ptr->file_size;
         if (!aodbm_read_bytes(ptr, &type, 1)) {
             break;
         }
@@ -71,9 +75,8 @@ aodbm *aodbm_open(const char *filename) {
             /* update version */
             uint64_t ver;
             if (!aodbm_read_bytes(ptr, &ver, 8)) {
-                /* TODO: modify to truncate */
-                printf("error, unexpected EOF whilst reading a version\n");
-                exit(1);
+                aodbm_truncate(ptr, block_begin);
+                break;
             }
             ptr->cur = ntohll(ver);
             ptr->file_size += 8;
@@ -81,17 +84,16 @@ aodbm *aodbm_open(const char *filename) {
             /* traverse data */
             uint32_t sz;
             if (!aodbm_read_bytes(ptr, &sz, 4)) {
-                /* TODO: modify to truncate */
-                printf("error, unexpected EOF whilst reading a data block\n");
-                exit(1);
+                aodbm_truncate(ptr, block_begin);
+                break;
             }
             ptr->file_size += 4;
             sz = ntohl(sz);
-            if (!aodbm_seek(ptr, sz, SEEK_CUR)) {
-                /* TODO: check for EOF, truncate file */
-                printf("error, cannot seek\n");
-                exit(1);
+            if (ptr->file_size + sz > actual_size) {
+                aodbm_truncate(ptr, block_begin);
+                break;
             }
+            aodbm_seek(ptr, sz, SEEK_CUR);
             ptr->file_size += sz;
         } else {
             printf("error, unknown block type\n");
