@@ -16,7 +16,8 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 '''
 
-import unittest, tests
+import unittest, tests, os
 
 if __name__ == '__main__':
     unittest.TextTestRunner().run(tests.tests)
+    os.remove("testdb")
