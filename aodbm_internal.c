@@ -5,7 +5,7 @@
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
     the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
+    (at your option) any later version.f
 
     This program is distributed in the hope that it will be useful,
     but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -107,12 +107,12 @@ bool aodbm_read_bytes(aodbm *db, void *ptr, size_t sz) {
     return fread(ptr, 1, sz, db->fd) == sz;
 }
 
-bool aodbm_seek(aodbm *db, size_t off, int startpoint) {
-    return fseek(db->fd, off, startpoint) == 0;
+bool aodbm_seek(aodbm *db, int64_t off, int startpoint) {
+    return fseeko(db->fd, off, startpoint) == 0;
 }
 
 uint64_t aodbm_tell(aodbm *db) {
-    return ftell(db->fd);
+    return ftello(db->fd);
 }
 
 void aodbm_write_bytes(aodbm *db, void *ptr, size_t sz) {

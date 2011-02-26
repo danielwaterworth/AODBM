@@ -39,7 +39,7 @@ aodbm_rope *make_record(aodbm_data *, aodbm_data *);
 aodbm_rope *make_record_di(aodbm_data *, aodbm_data *);
 
 bool aodbm_read_bytes(aodbm *, void *, size_t);
-bool aodbm_seek(aodbm *, size_t, int);
+bool aodbm_seek(aodbm *, int64_t, int);
 uint64_t aodbm_tell(aodbm *);
 void aodbm_write_bytes(aodbm *, void *, size_t);
 void aodbm_truncate(aodbm *, uint64_t);
