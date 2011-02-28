@@ -419,7 +419,7 @@ void add_to_branch(branch *node, aodbm_data *key, uint64_t off) {
 }
 
 void add_to_branches_di(branch *a, branch *b, aodbm_data *key, uint64_t off) {
-    if (a->sz + 1 < MAX_NODE_SIZE/2) {
+    if (a->sz < MAX_NODE_SIZE/2) {
         add_to_branch_di(a, key, off);
     } else {
         add_to_branch_di(b, key, off);
@@ -466,7 +466,7 @@ modify_result modify_branch(aodbm *db,
     pos += 8;
     
     uint32_t i;
-    bool a_placed = false;
+    bool a_placed = a_key == NULL;
     bool b_placed = b_key == NULL;
     
     if (off != rm_a && off != rm_b) {
@@ -512,8 +512,15 @@ modify_result modify_branch(aodbm *db,
     }
     
     modify_result result;
-    if (b.sz + 1 < MAX_NODE_SIZE/2) {
+    if (b.sz < MAX_NODE_SIZE/2) {
         merge_branches(&a, &b);
+        if (a.sz == 0) {
+            printf("error, special case 1\n");
+            exit(1);
+        } else if (a.sz == 1) {
+            printf("error, special case 2\n");
+            exit(1);
+        } 
         result.a_node = branch_to_rope(&a);
         result.a_key = a.key;
         result.b_node = NULL;
@@ -694,20 +701,25 @@ aodbm_version aodbm_del(aodbm *db, aodbm_version ver, aodbm_data *key) {
         while (path != NULL) {
             node = aodbm_path_pop(&path);
             
-            uint64_t a_sz, b_sz;
-            a_sz = aodbm_rope_size(nodes.a_node);
-            a = data_sz + append_pos;
-            data = aodbm_rope_merge_di(data, nodes.a_node);
-            data_sz += a_sz;
+            if (nodes.a_key == NULL) {
+                a = 0;
+            } else {
+                uint64_t a_sz;
+                a_sz = aodbm_rope_size(nodes.a_node);
+                a = data_sz + append_pos;
+                data = aodbm_rope_merge_di(data, nodes.a_node);
+                data_sz += a_sz;
+            }
             if (nodes.b_node == NULL) {
                 b = 0;
             } else {
+                uint64_t b_sz;
                 b_sz = aodbm_rope_size(nodes.b_node);
                 b = data_sz + append_pos;
                 data = aodbm_rope_merge_di(data, nodes.b_node);
                 data_sz += b_sz;
             }
-        
+            
             nodes = modify_branch(db,
                                   node.node,
                                   node.key,
