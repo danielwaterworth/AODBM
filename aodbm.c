@@ -245,6 +245,9 @@ range_result insert_into_leaf_range(aodbm *db,
                 key1 = aodbm_data_dup(d_key);
             }
             data = aodbm_rope_merge_di(data, make_record_di(d_key, d_val));
+        } else {
+            aodbm_free_data(d_key);
+            aodbm_free_data(d_val);
         }
         if (cmp != 1) {
             break;
@@ -271,6 +274,7 @@ range_result insert_into_leaf_range(aodbm *db,
             result.node = aodbm_rope_merge_di(data, i_rec);
             result.sz = num + 1;
         } else {
+            aodbm_free_rope(i_rec);
             result.node = data;
             result.inserted = false;
             result.sz = num;
@@ -319,10 +323,7 @@ modify_result insert_into_leaf(aodbm *db,
         return result;
     } else if (sz == 0) {
         modify_result result;
-        result.a_node = aodbm_data2_to_rope_di(aodbm_data_from_str("l"),
-                                               aodbm_data_from_32(1));
-        result.a_node = aodbm_rope_merge_di(result.a_node,
-                                            make_record(key, val));
+        result.a_node = aodbm_leaf_node(key, val);
         result.a_key = aodbm_data_dup(key);
         result.b_node = NULL;
         result.b_key = NULL;
@@ -383,9 +384,8 @@ modify_result remove_from_leaf(aodbm *db,
     aodbm_rope *header =
         aodbm_data2_to_rope_di(aodbm_data_from_str("l"),
                                aodbm_data_from_32(sz - (removed?1:0)));
-    data = aodbm_rope_merge_di(header, data);
     
-    result.a_node = data;
+    result.a_node = aodbm_rope_merge_di(header, data);
     return result;
 }
 
@@ -431,7 +431,7 @@ void add_to_branches(branch *a, branch *b, aodbm_data *key, uint64_t off) {
 }
 
 void merge_branches(branch *a, branch *b) {
-    if (b->sz) {
+    if (b->sz > 0) {
         a->sz += b->sz;
         a->data = aodbm_rope_merge_di(a->data, make_block_di(b->key));
         a->data = aodbm_rope_merge_di(a->data, b->data);
@@ -440,8 +440,8 @@ void merge_branches(branch *a, branch *b) {
 }
 
 aodbm_rope *branch_to_rope(branch *br) {
-    aodbm_rope *header = aodbm_data2_to_rope(aodbm_data_from_str("b"),
-                                             aodbm_data_from_32(br->sz - 1));
+    aodbm_rope *header = aodbm_data2_to_rope_di(aodbm_data_from_str("b"),
+                                                aodbm_data_from_32(br->sz - 1));
     return aodbm_rope_merge_di(header, br->data);
 }
 
@@ -501,6 +501,8 @@ modify_result modify_branch(aodbm *db,
         
         if (off != rm_a && off != rm_b) {
             add_to_branches_di(&a, &b, key, off);
+        } else {
+            aodbm_free_data(key);
         }
     }
     
@@ -562,7 +564,6 @@ root_result construct_root_di(uint64_t prev,
             result.root = append_pos + data_sz;
         } else {
             aodbm_rope_prepend_di(root, nodes.a_node);
-        
             data = aodbm_rope_merge_di(data, nodes.a_node);
             
             result.root = data_sz + append_pos;
@@ -601,7 +602,7 @@ aodbm_version aodbm_set(aodbm *db,
                         aodbm_data *val) {
     /* it has to be locked to prevent the append_pos going astray */
     pthread_mutex_lock(&db->rw);
-    /* find the position of the appendment (filesize + data block header) */
+    /* find the position of the amendment (filesize + data block header) */
     uint64_t append_pos = aodbm_file_size(db) + 5;
     root_result result;
     
