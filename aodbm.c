@@ -527,6 +527,56 @@ modify_result modify_branch(aodbm *db,
     return result;
 }
 
+typedef struct {
+    aodbm_data *dat;
+    uint64_t root;
+} root_result;
+
+root_result construct_root_di(uint64_t prev,
+                              uint64_t append_pos,
+                              aodbm_rope *data,
+                              size_t data_sz,
+                              modify_result nodes) {
+    root_result result;
+    aodbm_data *root = aodbm_data_from_64(prev);
+    
+    if (nodes.a_key != NULL) {
+        aodbm_free_data(nodes.a_key);
+    }
+    if (nodes.b_key == NULL) {
+        aodbm_rope_prepend_di(root, nodes.a_node);
+        
+        data = aodbm_rope_merge_di(data, nodes.a_node);
+        
+        result.root = data_sz + append_pos;
+    } else {
+        uint64_t a_sz, b_sz;
+        uint64_t a, b;
+        a_sz = aodbm_rope_size(nodes.a_node);
+        a = data_sz + append_pos;
+        data = aodbm_rope_merge_di(data, nodes.a_node);
+        data_sz += a_sz;
+        
+        b_sz = aodbm_rope_size(nodes.b_node);
+        b = data_sz + append_pos;
+        data = aodbm_rope_merge_di(data, nodes.b_node);
+        data_sz += b_sz;
+        
+        /* create a new branch node */
+        aodbm_rope *br = aodbm_branch_di(a, nodes.b_key, b);
+        
+        aodbm_rope_prepend_di(root, br);
+        
+        result.root = data_sz + append_pos;
+        
+        data = aodbm_rope_merge_di(data, br);
+    }
+    
+    result.dat = aodbm_rope_to_data_di(data);
+    
+    return result;
+}
+
 aodbm_version aodbm_set(aodbm *db,
                         aodbm_version ver,
                         aodbm_data *key,
@@ -535,43 +585,24 @@ aodbm_version aodbm_set(aodbm *db,
     pthread_mutex_lock(&db->rw);
     /* find the position of the appendment (filesize + data block header) */
     uint64_t append_pos = aodbm_file_size(db) + 5;
-    aodbm_version result;
-    aodbm_data *root = aodbm_data_from_64(ver);
-    aodbm_data *append;
+    root_result result;
     
     if (ver == 0) {
         aodbm_rope *node = aodbm_leaf_node(key, val);
-        aodbm_rope_prepend_di(root, node);
+        aodbm_rope_prepend_di(aodbm_data_from_64(ver), node);
         
-        append = aodbm_rope_to_data_di(node);
-        result = append_pos;
+        result.dat = aodbm_rope_to_data_di(node);
+        result.root = append_pos;
     } else {
         char type;
         aodbm_read(db, ver + 8, 1, &type);
         if (type == 'l') {
             modify_result leaf = insert_into_leaf(db, key, val, ver + 9);
-            aodbm_free_data(leaf.a_key);
-            if (leaf.b_node == NULL) {
-                aodbm_rope *data = leaf.a_node;
-                aodbm_rope_prepend_di(root, data);
-                
-                append = aodbm_rope_to_data_di(data);
-                result = append_pos;
-            } else {
-                size_t a_sz = aodbm_rope_size(leaf.a_node);
-                size_t b_sz = aodbm_rope_size(leaf.b_node);
-                
-                aodbm_rope *data =
-                    aodbm_rope_merge_di(leaf.a_node, leaf.b_node);
-                size_t data_sz = a_sz + b_sz;
-                aodbm_rope *br = aodbm_branch_di(append_pos,
-                                                 leaf.b_key,
-                                                 append_pos + a_sz);
-                aodbm_rope_prepend_di(root, br);
-                
-                append = aodbm_rope_to_data_di(aodbm_rope_merge_di(data, br));
-                result = append_pos + data_sz;
-            }
+            result = construct_root_di(ver,
+                                       append_pos,
+                                       aodbm_rope_empty(),
+                                       0,
+                                       leaf);
         } else if (type = 'b') {
             aodbm_rope *data = aodbm_rope_empty();
             uint32_t data_sz = 0;
@@ -614,51 +645,19 @@ aodbm_version aodbm_set(aodbm *db,
                 prev_node = node.node;
             }
             
-            aodbm_free_data(nodes.a_key);
-            if (nodes.b_key == NULL) {
-                aodbm_rope_prepend_di(root, nodes.a_node);
-                
-                data = aodbm_rope_merge_di(data, nodes.a_node);
-                
-                result = data_sz + append_pos;
-            } else {
-                uint64_t a_sz, b_sz;
-                a_sz = aodbm_rope_size(nodes.a_node);
-                a = data_sz + append_pos;
-                data = aodbm_rope_merge_di(data, nodes.a_node);
-                data_sz += a_sz;
-                if (nodes.b_node == NULL) {
-                    b = 0;
-                } else {
-                    b_sz = aodbm_rope_size(nodes.b_node);
-                    b = data_sz + append_pos;
-                    data = aodbm_rope_merge_di(data, nodes.b_node);
-                    data_sz += b_sz;
-                }
-                
-                /* create a new branch node */
-                aodbm_rope *br = aodbm_branch_di(a, nodes.b_key, b);
-                
-                aodbm_rope_prepend_di(root, br);
-                
-                result = data_sz + append_pos;
-                
-                data = aodbm_rope_merge_di(data, br);
-            }
-            
-            append = aodbm_rope_to_data_di(data);
+            result = construct_root_di(ver, append_pos, data, data_sz, nodes);
         } else {
             printf("unknown node type\n");
             exit(1);
         }
     }
     
-    aodbm_write_data_block(db, append);
-    aodbm_free_data(append);
+    aodbm_write_data_block(db, result.dat);
+    aodbm_free_data(result.dat);
     
     pthread_mutex_lock(&db->rw);
     
-    return result;
+    return result.root;
 }
 
 aodbm_version aodbm_del(aodbm *db, aodbm_version ver, aodbm_data *key) {
@@ -672,24 +671,13 @@ aodbm_version aodbm_del(aodbm *db, aodbm_version ver, aodbm_data *key) {
     /* find the position of the appendment (filesize + data block header) */
     uint64_t append_pos = aodbm_file_size(db) + 5;
     
-    aodbm_data *append;
-    uint64_t result;
-    
-    aodbm_data *root = aodbm_data_from_64(ver);
+    root_result result;
     
     char type;
     aodbm_read(db, ver + 8, 1, &type);
     if (type == 'l') {
         modify_result res = remove_from_leaf(db, key, ver + 9);
-        if (res.a_key != NULL) {
-            /* empty leaves don't have a key */
-            aodbm_free_data(res.a_key);
-        }
-        
-        aodbm_rope_prepend_di(root, res.a_node);
-        
-        append = aodbm_rope_to_data_di(res.a_node);
-        result = append_pos;
+        result = construct_root_di(ver, append_pos, aodbm_rope_empty(), 0, res);
     } else if (type == 'b') {
         /* TODO: modify to merge nodes */
         aodbm_rope *data = aodbm_rope_empty();
@@ -734,50 +722,17 @@ aodbm_version aodbm_del(aodbm *db, aodbm_version ver, aodbm_data *key) {
             prev_node = node.node;
         }
         
-        aodbm_free_data(nodes.a_key);
-        /* TODO: write a function to construct root nodes */
-        if (nodes.b_key == NULL) {
-            aodbm_rope_prepend_di(root, nodes.a_node);
-            
-            data = aodbm_rope_merge_di(data, nodes.a_node);
-            
-            result = data_sz + append_pos;
-        } else {
-            uint64_t a_sz, b_sz;
-            a_sz = aodbm_rope_size(nodes.a_node);
-            a = data_sz + append_pos;
-            data = aodbm_rope_merge_di(data, nodes.a_node);
-            data_sz += a_sz;
-            if (nodes.b_node == NULL) {
-                b = 0;
-            } else {
-                b_sz = aodbm_rope_size(nodes.b_node);
-                b = data_sz + append_pos;
-                data = aodbm_rope_merge_di(data, nodes.b_node);
-                data_sz += b_sz;
-            }
-            
-            /* create a new branch node */
-            aodbm_rope *br = aodbm_branch_di(a, nodes.b_key, b);
-            
-            aodbm_rope_prepend_di(root, br);
-            
-            result = data_sz + append_pos;
-            
-            data = aodbm_rope_merge_di(data, br);
-        }
-        
-        append = aodbm_rope_to_data_di(data);
+        result = construct_root_di(ver, append_pos, data, data_sz, nodes);
     } else {
         printf("unknown node type\n");
         exit(1);
     }
     
-    aodbm_write_data_block(db, append);
-    aodbm_free_data(append);
+    aodbm_write_data_block(db, result.dat);
+    aodbm_free_data(result.dat);
     
     pthread_mutex_unlock(&db->rw);
-    return result;
+    return result.root;
 }
 
 bool aodbm_has(aodbm *db, aodbm_version ver, aodbm_data *key) {
