@@ -515,16 +515,19 @@ modify_result modify_branch(aodbm *db,
     if (b.sz < MAX_NODE_SIZE/2) {
         merge_branches(&a, &b);
         if (a.sz == 0) {
-            printf("error, special case 1\n");
-            exit(1);
-        } else if (a.sz == 1) {
+            result.a_node = NULL;
+            result.a_key = NULL;
+            result.b_node = NULL;
+            result.b_key = NULL;
+        } /*else if (a.sz == 1) {
             printf("error, special case 2\n");
             exit(1);
-        } 
-        result.a_node = branch_to_rope(&a);
-        result.a_key = a.key;
-        result.b_node = NULL;
-        result.b_key = NULL;
+        } */ else {
+            result.a_node = branch_to_rope(&a);
+            result.a_key = a.key;
+            result.b_node = NULL;
+            result.b_key = NULL;
+        }
     } else {
         result.a_node = branch_to_rope(&a);
         result.b_node = branch_to_rope(&b);
@@ -551,11 +554,19 @@ root_result construct_root_di(uint64_t prev,
         aodbm_free_data(nodes.a_key);
     }
     if (nodes.b_key == NULL) {
-        aodbm_rope_prepend_di(root, nodes.a_node);
+        if (nodes.a_key == NULL) {
+            aodbm_rope_append_di(data, root);
+            aodbm_rope_append_di(data, aodbm_data_from_str("l"));
+            aodbm_rope_append_di(data, aodbm_data_from_32(0));
+            
+            result.root = append_pos + data_sz;
+        } else {
+            aodbm_rope_prepend_di(root, nodes.a_node);
         
-        data = aodbm_rope_merge_di(data, nodes.a_node);
-        
-        result.root = data_sz + append_pos;
+            data = aodbm_rope_merge_di(data, nodes.a_node);
+            
+            result.root = data_sz + append_pos;
+        }
     } else {
         uint64_t a_sz, b_sz;
         uint64_t a, b;
