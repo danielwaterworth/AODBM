@@ -4,6 +4,6 @@ flags = -g -D_FILE_OFFSET_BITS=64 #-DAODBM_USE_MMAP
 
 all:
 	gcc ${srcs} -fPIC -c -I./ -D_GNU_SOURCE ${flags}
-	rm libaodbm.a
+	rm libaodbm.a -f
 	ar -cq libaodbm.a ${objs}
 	gcc ${objs} -shared -o libaodbm.so ${flags}

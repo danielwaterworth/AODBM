@@ -268,9 +268,9 @@ void aodbm_path_print(aodbm_path *path) {
     aodbm_path *it;
     printf("[");
     for (it = path; it->up != NULL; it = it->up) {
-        printf("%llu, ", it->node.node);
+        printf("%llu, ", (long long unsigned int)it->node.node);
     }
-    printf("%llu]", it->node.node);
+    printf("%llu]", (long long unsigned int)it->node.node);
 }
 
 void aodbm_path_push(aodbm_path **path, aodbm_path_node node) {
