@@ -21,7 +21,10 @@
 #include "assert.h"
 #include "string.h"
 
+#include "pthread.h"
+
 #include "aodbm_internal.h"
+#include "aodbm_error.h"
 
 #include <arpa/inet.h>
 
@@ -31,8 +34,6 @@
 
 #ifdef AODBM_USE_MMAP
 #include <unistd.h>
-#include <fcntl.h>
-
 #include <sys/mman.h>
 #endif
 
@@ -108,16 +109,14 @@ bool aodbm_read_bytes(aodbm *db, void *ptr, size_t sz) {
         if (feof(db->fd)) {
             return false;
         }
-        perror("aodbm");
-        exit(1);
+        AODBM_OS_ERROR();
     }
     return true;
 }
 
 void aodbm_seek(aodbm *db, int64_t off, int startpoint) {
     if (fseeko(db->fd, off, startpoint) != 0) {
-        perror("aodbm");
-        exit(1);
+        AODBM_OS_ERROR();
     }
 }
 
@@ -126,17 +125,15 @@ uint64_t aodbm_tell(aodbm *db) {
 }
 
 void aodbm_write_bytes(aodbm *db, void *ptr, size_t sz) {
-    db->file_size += sz;
     if (fwrite(ptr, 1, sz, db->fd) != sz) {
-        perror("aodbm");
-        exit(1);
+        AODBM_OS_ERROR();
     }
+    db->file_size += sz;
 }
 
 void aodbm_truncate(aodbm *db, uint64_t sz) {
     if (ftruncate(fileno(db->fd), sz) != 0) {
-        perror("aodbm");
-        exit(1);
+        AODBM_OS_ERROR();
     }
     db->file_size = sz;
 }
@@ -163,33 +160,53 @@ void aodbm_write_version(aodbm *db, uint64_t ver) {
 
 void aodbm_read(aodbm *db, uint64_t off, size_t sz, void *ptr) {
     #ifdef AODBM_USE_MMAP
-    long page_size = sysconf(_SC_PAGE_SIZE);
+    pthread_rwlock_rdlock(&db->mmap_mut);
     
-    uint64_t start, end;
-    start = off - (off % page_size);
-    end = off + sz;
-    
-    if (end % page_size != 0) {
-        end = end - (end % page_size) + page_size;
-    }
-    
-    size_t map_sz = end - start;
-    
-    if (end < aodbm_file_size(db)) {
-        void *mapping =
-            mmap(NULL, map_sz, PROT_READ, MAP_SHARED, fileno(db->fd), start);
-        if (mapping == MAP_FAILED) {
-            perror("aodbm");
-            exit(1);
+    if (db->mapping_size < off + (uint64_t)sz) {
+        long page_size = sysconf(_SC_PAGE_SIZE);
+        size_t new_size = db->file_size - (db->file_size % page_size);
+        
+        if (new_size < off + (uint64_t)sz) {
+            pthread_rwlock_unlock(&db->mmap_mut);
+            
+            pthread_mutex_lock(&db->rw);
+            aodbm_seek(db, off, SEEK_SET);
+            aodbm_read_bytes(db, ptr, sz);
+            pthread_mutex_unlock(&db->rw);
+            return;
         }
-        memcpy(ptr, mapping + (off - start), sz);
-        munmap(mapping, map_sz);
-    } else {
-        pthread_mutex_lock(&db->rw);
-        aodbm_seek(db, off, SEEK_SET);
-        aodbm_read_bytes(db, ptr, sz);
-        pthread_mutex_unlock(&db->rw);
+        
+        pthread_rwlock_unlock(&db->mmap_mut);
+        pthread_rwlock_wrlock(&db->mmap_mut);
+        if (db->mapping == NULL) {
+            db->mapping = mmap(NULL,
+                               new_size,
+                               PROT_READ,
+                               MAP_SHARED,
+                               fileno(db->fd),
+                               0);
+            if (db->mapping == MAP_FAILED) {
+                AODBM_OS_ERROR();
+            }
+            db->mapping_size = new_size;
+        } else {
+            if (db->mapping_size < new_size) {
+                db->mapping = mremap((void *)db->mapping,
+                                     db->mapping_size,
+                                     new_size,
+                                     MREMAP_MAYMOVE);
+                if (db->mapping == MAP_FAILED) {
+                    AODBM_OS_ERROR();
+                }
+                db->mapping_size = new_size;
+            }
+        }
+        pthread_rwlock_unlock(&db->mmap_mut);
+        pthread_rwlock_rdlock(&db->mmap_mut);
     }
+    
+    memcpy(ptr, (void *)db->mapping + (size_t)off, sz);
+    pthread_rwlock_unlock(&db->mmap_mut);
     #else
     pthread_mutex_lock(&db->rw);
     aodbm_seek(db, off, SEEK_SET);
@@ -245,16 +262,14 @@ uint64_t aodbm_search_recursive(aodbm *db, uint64_t node, aodbm_data *key) {
         }
         return aodbm_search_recursive(db, off, key);
     } else {
-        printf("unknown node type\n");
-        exit(1);
+        AODBM_CUSTOM_ERROR("unknown node type");
     }
 }
 
 /* returns the offset of the leaf node that the key belongs in */
 uint64_t aodbm_search(aodbm *db, aodbm_version version, aodbm_data *key) {
     if (version == 0) {
-        printf("error, given the 0 version for a search\n");
-        exit(1);
+        AODBM_CUSTOM_ERROR("error, given the 0 version for a search");
     }
     return aodbm_search_recursive(db, version + 8, key);
 }
@@ -286,8 +301,7 @@ void aodbm_path_push(aodbm_path **path, aodbm_path_node node) {
 
 aodbm_path_node aodbm_path_pop(aodbm_path **path) {
     if (*path == NULL) {
-        printf("cannot pop an empty aodbm_path\n");
-        exit(1);
+        AODBM_CUSTOM_ERROR("cannot pop an empty aodbm_path");
     } else {
         aodbm_path_node result = (*path)->node;
         aodbm_path *fr = *path;
@@ -336,15 +350,13 @@ void aodbm_search_path_recursive(aodbm *db,
         aodbm_search_path_recursive(db, off, prev_key, key, path);
         return;
     } else {
-        printf("unknown node type\n");
-        exit(1);
+        AODBM_CUSTOM_ERROR("unknown node type");
     }
 }
 
 aodbm_path *aodbm_search_path(aodbm *db, aodbm_version ver, aodbm_data *key) {
     if (ver == 0) {
-        printf("error, given the 0 version for a search\n");
-        exit(1);
+        AODBM_CUSTOM_ERROR("error, given the 0 version for a search");
     }
     aodbm_path *path = NULL;
     aodbm_search_path_recursive(db, ver + 8, aodbm_data_empty(), key, &path);

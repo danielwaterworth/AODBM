@@ -6,7 +6,7 @@ class TestBig(unittest.TestCase):
     
     def test_big(self):
         ver = aodbm.Version(self.db, 0)
-        nums = range(500)
+        nums = range(5000)
         random.shuffle(nums)
         for n in nums:
             ver['hello' + str(n)] = 'world' + str(n)

@@ -27,6 +27,11 @@ struct aodbm {
     pthread_mutex_t rw;
     volatile uint64_t cur;
     pthread_mutex_t version;
+    #ifdef AODBM_USE_MMAP
+    volatile void *mapping;
+    volatile uint64_t mapping_size;
+    pthread_rwlock_t mmap_mut;
+    #endif
 };
 
 void print_hex(unsigned char);

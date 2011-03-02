@@ -34,20 +34,21 @@
 #define htonll(x) ntohll(x)
 
 #ifdef AODBM_USE_MMAP
+#include <sys/mman.h>
 #include <unistd.h>
-#include <fcntl.h>
 #endif
 
 #include "aodbm.h"
 #include "aodbm_internal.h"
+
+#include "aodbm_error.h"
 
 aodbm *aodbm_open(const char *filename) {
     aodbm *ptr = malloc(sizeof(aodbm));
     ptr->file_size = 0;
     ptr->fd = fopen(filename, "a+b");
     if (ptr->fd == NULL) {
-        printf("couldn't open file\n");
-        exit(1);
+        AODBM_CUSTOM_ERROR("couldn't open file");
     }
     
     pthread_mutexattr_t rec;
@@ -96,10 +97,27 @@ aodbm *aodbm_open(const char *filename) {
             aodbm_seek(ptr, sz, SEEK_CUR);
             ptr->file_size += sz;
         } else {
-            printf("error, unknown block type\n");
-            exit(1);
+            AODBM_CUSTOM_ERROR("error, unknown block type");
         }
     }
+    
+    #ifdef AODBM_USE_MMAP
+    pthread_rwlock_init(&ptr->mmap_mut, NULL);
+    /* create mapping */
+    long page_size = sysconf(_SC_PAGE_SIZE);
+    
+    size_t sz = ptr->file_size - (ptr->file_size % page_size);
+    if (sz != 0) {
+        ptr->mapping = mmap(NULL, sz, PROT_READ, MAP_SHARED, fileno(ptr->fd), 0);
+        if (ptr->mapping == MAP_FAILED) {
+            AODBM_OS_ERROR();
+        }
+        ptr->mapping_size = sz;
+    } else {
+        ptr->mapping = NULL;
+        ptr->mapping_size = 0;
+    }
+    #endif
     
     return ptr;
 }
@@ -108,6 +126,11 @@ void aodbm_close(aodbm *db) {
     fclose(db->fd);
     pthread_mutex_destroy(&db->rw);
     pthread_mutex_destroy(&db->version);
+    #ifdef AODBM_USE_MMAP
+    pthread_rwlock_destroy(&db->mmap_mut);
+    void *mapping = (void *)db->mapping;
+    munmap(mapping, db->mapping_size);
+    #endif
     free(db);
 }
 
@@ -338,8 +361,7 @@ modify_result insert_into_leaf(aodbm *db,
         result.b_key = NULL;
         return result;
     } else {
-        printf("found a node with a size beyond MAX_NODE_SIZE\n");
-        exit(1);
+        AODBM_CUSTOM_ERROR("found a node with a size beyond MAX_NODE_SIZE");
     }
 }
 
@@ -666,8 +688,7 @@ aodbm_version aodbm_set(aodbm *db,
             
             result = construct_root_di(ver, append_pos, data, data_sz, nodes);
         } else {
-            printf("unknown node type\n");
-            exit(1);
+            AODBM_CUSTOM_ERROR("unknown node type");
         }
     }
     
@@ -748,8 +769,7 @@ aodbm_version aodbm_del(aodbm *db, aodbm_version ver, aodbm_data *key) {
         
         result = construct_root_di(ver, append_pos, data, data_sz, nodes);
     } else {
-        printf("unknown node type\n");
-        exit(1);
+        AODBM_CUSTOM_ERROR("unknown node type");
     }
     
     aodbm_write_data_block(db, result.dat);
