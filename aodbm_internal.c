@@ -160,14 +160,14 @@ void aodbm_write_version(aodbm *db, uint64_t ver) {
 
 void aodbm_read(aodbm *db, uint64_t off, size_t sz, void *ptr) {
     #ifdef AODBM_USE_MMAP
-    pthread_rwlock_rdlock(&db->mmap_mut);
+    aodbm_rwlock_rdlock(&db->mmap_mut);
     
     if (db->mapping_size < off + (uint64_t)sz) {
         long page_size = sysconf(_SC_PAGE_SIZE);
         size_t new_size = db->file_size - (db->file_size % page_size);
         
         if (new_size < off + (uint64_t)sz) {
-            pthread_rwlock_unlock(&db->mmap_mut);
+            aodbm_rwlock_unlock(&db->mmap_mut);
             
             pthread_mutex_lock(&db->rw);
             aodbm_seek(db, off, SEEK_SET);
@@ -176,8 +176,8 @@ void aodbm_read(aodbm *db, uint64_t off, size_t sz, void *ptr) {
             return;
         }
         
-        pthread_rwlock_unlock(&db->mmap_mut);
-        pthread_rwlock_wrlock(&db->mmap_mut);
+        aodbm_rwlock_unlock(&db->mmap_mut);
+        aodbm_rwlock_wrlock(&db->mmap_mut);
         if (db->mapping == NULL) {
             db->mapping = mmap(NULL,
                                new_size,
@@ -201,12 +201,12 @@ void aodbm_read(aodbm *db, uint64_t off, size_t sz, void *ptr) {
                 db->mapping_size = new_size;
             }
         }
-        pthread_rwlock_unlock(&db->mmap_mut);
-        pthread_rwlock_rdlock(&db->mmap_mut);
+        aodbm_rwlock_unlock(&db->mmap_mut);
+        aodbm_rwlock_rdlock(&db->mmap_mut);
     }
     
     memcpy(ptr, (void *)db->mapping + (size_t)off, sz);
-    pthread_rwlock_unlock(&db->mmap_mut);
+    aodbm_rwlock_unlock(&db->mmap_mut);
     #else
     pthread_mutex_lock(&db->rw);
     aodbm_seek(db, off, SEEK_SET);

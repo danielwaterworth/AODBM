@@ -1,5 +1,5 @@
-srcs = aodbm.c aodbm_data.c aodbm_rope.c aodbm_internal.c
-objs = aodbm.o aodbm_data.o aodbm_rope.o aodbm_internal.o
+srcs = aodbm.c aodbm_data.c aodbm_rope.c aodbm_internal.c aodbm_rwlock.c
+objs = aodbm.o aodbm_data.o aodbm_rope.o aodbm_internal.o aodbm_rwlock.o
 flags = -g -D_FILE_OFFSET_BITS=64 #-DAODBM_USE_MMAP
 
 all:

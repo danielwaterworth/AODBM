@@ -102,7 +102,7 @@ aodbm *aodbm_open(const char *filename) {
     }
     
     #ifdef AODBM_USE_MMAP
-    pthread_rwlock_init(&ptr->mmap_mut, NULL);
+    aodbm_rwlock_init(&ptr->mmap_mut);
     /* create mapping */
     long page_size = sysconf(_SC_PAGE_SIZE);
     
@@ -127,7 +127,7 @@ void aodbm_close(aodbm *db) {
     pthread_mutex_destroy(&db->rw);
     pthread_mutex_destroy(&db->version);
     #ifdef AODBM_USE_MMAP
-    pthread_rwlock_destroy(&db->mmap_mut);
+    aodbm_rwlock_destroy(&db->mmap_mut);
     void *mapping = (void *)db->mapping;
     munmap(mapping, db->mapping_size);
     #endif

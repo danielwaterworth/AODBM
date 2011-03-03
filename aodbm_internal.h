@@ -20,6 +20,7 @@
 #define AODBM_INTERNAL
 
 #include "aodbm.h"
+#include "aodbm_rwlock.h"
 
 struct aodbm {
     uint64_t file_size;
@@ -30,7 +31,7 @@ struct aodbm {
     #ifdef AODBM_USE_MMAP
     volatile void *mapping;
     volatile uint64_t mapping_size;
-    pthread_rwlock_t mmap_mut;
+    aodbm_rwlock_t mmap_mut;
     #endif
 };
 
