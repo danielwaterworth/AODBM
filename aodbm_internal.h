@@ -20,6 +20,8 @@
 #define AODBM_INTERNAL
 
 #include "aodbm.h"
+#include "aodbm_data.h"
+#include "aodbm_rope.h"
 #include "aodbm_rwlock.h"
 
 struct aodbm {

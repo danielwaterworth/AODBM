@@ -26,6 +26,8 @@
 #define htonll(x) ntohll(x)
 
 #include "aodbm.h"
+#include "aodbm_data.h"
+#include "aodbm_rope.h"
 
 aodbm_data *aodbm_construct_data(const char *dat, size_t sz) {
     aodbm_data *ptr = malloc(sizeof(aodbm_data));

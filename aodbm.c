@@ -43,6 +43,8 @@
 
 #include "aodbm_error.h"
 
+uint64_t aodbm_file_size(aodbm *);
+
 aodbm *aodbm_open(const char *filename) {
     aodbm *ptr = malloc(sizeof(aodbm));
     ptr->file_size = 0;
@@ -128,8 +130,7 @@ void aodbm_close(aodbm *db) {
     pthread_mutex_destroy(&db->version);
     #ifdef AODBM_USE_MMAP
     aodbm_rwlock_destroy(&db->mmap_mut);
-    void *mapping = (void *)db->mapping;
-    munmap(mapping, db->mapping_size);
+    munmap((void *)db->mapping, db->mapping_size);
     #endif
     free(db);
 }

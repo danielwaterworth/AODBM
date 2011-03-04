@@ -51,66 +51,17 @@ typedef uint64_t aodbm_version;
 aodbm *aodbm_open(const char *);
 void aodbm_close(aodbm *);
 
-uint64_t aodbm_file_size(aodbm *);
-
 aodbm_version aodbm_current(aodbm *);
 bool aodbm_commit(aodbm *, aodbm_version);
-
-/* two phase commit */
-bool aodbm_commit_init(aodbm *db, uint64_t version);
-void aodbm_commit_finish(aodbm *db, uint64_t version);
-void aodbm_commit_abort(aodbm *db);
 
 bool aodbm_has(aodbm *, aodbm_version, aodbm_data *);
 aodbm_version aodbm_set(aodbm *, aodbm_version, aodbm_data *, aodbm_data *);
 aodbm_data *aodbm_get(aodbm *, aodbm_version, aodbm_data *);
 aodbm_version aodbm_del(aodbm *, aodbm_version, aodbm_data *);
+
 bool aodbm_is_based_on(aodbm *, aodbm_version, aodbm_version);
 aodbm_version aodbm_previous_version(aodbm *, aodbm_version);
 
-/* NOTE: functions ending in di have destructive input */
-
-/* aodbm_data functions */
-aodbm_data *aodbm_construct_data(const char *, size_t);
-aodbm_data *aodbm_data_dup(aodbm_data *);
-aodbm_data *aodbm_data_from_str(const char *);
-aodbm_data *aodbm_data_from_32(uint32_t);
-aodbm_data *aodbm_data_from_64(uint64_t);
-aodbm_data *aodbm_cat_data(aodbm_data *, aodbm_data *);
-aodbm_data *aodbm_cat_data_di(aodbm_data *, aodbm_data *);
-aodbm_data *aodbm_data_empty();
-aodbm_data *aodbm_data_dup(aodbm_data *);
-
-bool aodbm_data_lt(aodbm_data *, aodbm_data *);
-bool aodbm_data_gt(aodbm_data *, aodbm_data *);
-bool aodbm_data_le(aodbm_data *, aodbm_data *);
-bool aodbm_data_ge(aodbm_data *, aodbm_data *);
-bool aodbm_data_eq(aodbm_data *, aodbm_data *);
-int aodbm_data_cmp(aodbm_data *, aodbm_data *);
-
 void aodbm_free_data(aodbm_data *);
-
-/* data printing */
-void aodbm_print_data(aodbm_data *);
-void aodbm_print_rope(aodbm_rope *);
-
-/* aodbm_rope functions */
-aodbm_rope *aodbm_rope_empty();
-aodbm_rope *aodbm_data_to_rope_di(aodbm_data *);
-aodbm_rope *aodbm_data_to_rope(aodbm_data *);
-aodbm_rope *aodbm_data2_to_rope_di(aodbm_data *, aodbm_data *);
-aodbm_rope *aodbm_data2_to_rope(aodbm_data *, aodbm_data *);
-size_t aodbm_rope_size(aodbm_rope *);
-aodbm_data *aodbm_rope_to_data(aodbm_rope *);
-aodbm_data *aodbm_rope_to_data_di(aodbm_rope *);
-void aodbm_free_rope(aodbm_rope *);
-
-/* the aodbm_data object is destroyed */
-void aodbm_rope_append_di(aodbm_rope *, aodbm_data *);
-void aodbm_rope_prepend_di(aodbm_data *, aodbm_rope *);
-
-void aodbm_rope_append(aodbm_rope *, aodbm_data *);
-void aodbm_rope_prepend(aodbm_data *, aodbm_rope *);
-aodbm_rope *aodbm_rope_merge_di(aodbm_rope *, aodbm_rope *);
 
 #endif

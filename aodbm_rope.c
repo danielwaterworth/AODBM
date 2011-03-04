@@ -20,6 +20,8 @@
 #include <string.h>
 
 #include "aodbm.h"
+#include "aodbm_data.h"
+#include "aodbm_rope.h"
 
 struct aodbm_rope_node {
     aodbm_data *dat;

@@ -48,7 +48,58 @@ True
 C interface
 ===========
 
-TODO: document me!
+You'll need to link against either the static or shared library and include the 
+header file aodbm.h in order to use the C API.
+
+Before you can do anything, you will need a handle for a database. This is 
+simple to acquire, simply call aodbm_open passing the filename as a NULL 
+terminated string. This will return an "aodbm *", when you are done with the 
+handle then close the database using aodbm_close. These functions do not do 
+any filelocking so ensure that only one handle exists for a given database file 
+at any time.
+
+Once you have a handle, the next step is to obtain a reference to the most 
+current version of the database. Versions are represented as "aodbm_version"s. 
+Under the hood these are just "uint64_t"s, so don't worry about freeing them. 
+The most current version can be found using aodbm_current.
+
+By explicitly dealing with versions of the database, you can be sure that other 
+threads will not interfere during database operations.
+
+There are four database operations: get, set, delete and has. They appear in 
+the respective functions aodbm_get, aodbm_get, aodbm_del and aodbm_has. Each 
+deals with "aodbm_data *"s. The aodbm_data structure represents a piece of data 
+and is defined like so:
+
+struct aodbm_data {
+    char *dat;
+    size_t sz;
+};
+
+Each of the operations' function's first three arguments are the database 
+handle, the version of the database on which to operate on and the key to which 
+the operation relates to. aodbm_get return a "aodbm_data *" which is populated 
+with the value at the key or NULL if the record doesn't exist. When you have 
+finished using the value from this operation, you should free it with 
+aodbm_free_data. aodbm_set takes one extra argument, the value to store at the 
+given key. aodbm_set and aodbm_del both return the new version of the database 
+that you have created.
+
+The aodbm_data objects that you provide are not modified in any way.
+
+Having modified the database, you will likely want to commit the changes. 
+Commiting the changes means that when future requests for the current version 
+are made, your new version of the database will be returned. To commit your 
+changes, pass your new version as the second argument to aodbm_commit. This 
+will return a boolean value which indicated whether the commit was successful. 
+A commit will fail if you try to commit a version that is not based on the 
+current latest version.
+
+This only leaves two functions that haven't been covered in the public API. 
+aodbm_is_based_on and aodbm_previous_version. They both do exactly what you 
+think they'd do aodbm_is_based_on takes two arguments in addition to the 
+database handle and they are both aodbm_versions. It returns whether the first 
+is based on the second.
 
 Documentation
 =============
