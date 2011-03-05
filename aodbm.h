@@ -38,17 +38,9 @@ struct aodbm_data {
 typedef struct aodbm aodbm;
 typedef struct aodbm_data aodbm_data;
 
-/* this type is used to make merging aodbm_data objects cheaper */
-/* implementation note:
-     internally it is just a list of aodbm_data objects,
-     rather than the more usual tree of strings */
-struct aodbm_rope;
-typedef struct aodbm_rope aodbm_rope;
-
 typedef uint64_t aodbm_version;
 
-/* database functions */
-aodbm *aodbm_open(const char *);
+aodbm *aodbm_open(const char *, int);
 void aodbm_close(aodbm *);
 
 aodbm_version aodbm_current(aodbm *);

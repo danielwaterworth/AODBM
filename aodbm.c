@@ -45,7 +45,7 @@
 
 uint64_t aodbm_file_size(aodbm *);
 
-aodbm *aodbm_open(const char *filename) {
+aodbm *aodbm_open(const char *filename, int flags) {
     aodbm *ptr = malloc(sizeof(aodbm));
     ptr->file_size = 0;
     ptr->fd = fopen(filename, "a+b");

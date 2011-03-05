@@ -19,6 +19,13 @@
 #ifndef AODBM_ROPE_H
 #define AODBM_ROPE_H
 
+/* this type is used to make merging aodbm_data objects cheaper */
+/* implementation note:
+     internally it is just a list of aodbm_data objects,
+     rather than the more usual tree of strings */
+struct aodbm_rope;
+typedef struct aodbm_rope aodbm_rope;
+
 /* aodbm_rope functions */
 aodbm_rope *aodbm_rope_empty();
 aodbm_rope *aodbm_data_to_rope_di(aodbm_data *);

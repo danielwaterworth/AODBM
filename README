@@ -53,8 +53,9 @@ header file aodbm.h in order to use the C API.
 
 Before you can do anything, you will need a handle for a database. This is 
 simple to acquire, simply call aodbm_open passing the filename as a NULL 
-terminated string. This will return an "aodbm *", when you are done with the 
-handle then close the database using aodbm_close. These functions do not do 
+terminated string, the second argument is for flags. There are no flags at the 
+moment so just pass 0. This will return an "aodbm *", when you are done with 
+the handle then close the database using aodbm_close. These functions do not do 
 any filelocking so ensure that only one handle exists for a given database file 
 at any time.
 

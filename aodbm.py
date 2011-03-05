@@ -32,14 +32,14 @@ data_ptr = ctypes.POINTER(Data)
 
 aodbm_lib = ctypes.CDLL("./libaodbm.so")
 
-aodbm_lib.aodbm_open.argtypes = [ctypes.c_char_p]
+aodbm_lib.aodbm_open.argtypes = [ctypes.c_char_p, ctypes.c_int]
 aodbm_lib.aodbm_open.restype = ctypes.c_void_p
 
 aodbm_lib.aodbm_close.argtypes = [ctypes.c_void_p]
 aodbm_lib.aodbm_close.restype = None
 
 aodbm_lib.aodbm_current.argtypes = [ctypes.c_void_p]
-aodbm_lib.aodbm_close.restype = ctypes.c_uint64
+aodbm_lib.aodbm_current.restype = ctypes.c_uint64
 
 aodbm_lib.aodbm_commit.argtypes = [ctypes.c_void_p, ctypes.c_uint64]
 aodbm_lib.aodbm_commit.restype = ctypes.c_bool
@@ -113,9 +113,9 @@ class Version(object):
 
 class AODBM(object):
     '''Represents a Database'''
-    def __init__(self, filename):
+    def __init__(self, filename, flags=0):
         '''Open a new database'''
-        self.db = aodbm_lib.aodbm_open(filename)
+        self.db = aodbm_lib.aodbm_open(filename, flags)
     
     def __del__(self):
         aodbm_lib.aodbm_close(self.db)
