@@ -26,6 +26,8 @@ Python interface
 >>> version['hello'] = 'world'
 >>> version['hello']
 "world"
+>>> list(version)
+[('hello', 'world')]
 >>> del version['hello']
 # new versions
 >>> new_version = version.set_record('hello', 'world')
@@ -88,17 +90,33 @@ that you have created.
 
 The aodbm_data objects that you provide are not modified in any way.
 
+Iteration is also possible. First you must create an iterator using 
+aodbm_new_iterator, passing in the database handle and the version to iterate 
+over. Then call aodbm_iterator_next, passing in the database handle and the 
+iterator. This call is not thread-safe. It returns an aodbm_record that will be 
+filled with data (a key and a value) that you should free using aodbm_free_data 
+when you are finished using them. The key and value will be set to NULL when 
+the end of the database is reached. When you are finished using an iterator, 
+whether you have reached the end of the database or not, you should free the 
+iterator with aodbm_free_iterator. The records will be given in the order they 
+are stored in. The less than operator is defined like so:
+
+Given 2 keys, a and b.
+if a is shorter than b return true,
+if b is shorter than a return false,
+return the lexicographic ordering
+
 Having modified the database, you will likely want to commit the changes. 
 Commiting the changes means that when future requests for the current version 
 are made, your new version of the database will be returned. To commit your 
 changes, pass your new version as the second argument to aodbm_commit. This 
-will return a boolean value which indicated whether the commit was successful. 
+will return a boolean value which indicates whether the commit was successful. 
 A commit will fail if you try to commit a version that is not based on the 
 current latest version.
 
 This only leaves two functions that haven't been covered in the public API. 
 aodbm_is_based_on and aodbm_previous_version. They both do exactly what you 
-think they'd do aodbm_is_based_on takes two arguments in addition to the 
+think they'd do. aodbm_is_based_on takes two arguments in addition to the 
 database handle and they are both aodbm_versions. It returns whether the first 
 is based on the second.
 
