@@ -274,51 +274,39 @@ uint64_t aodbm_search(aodbm *db, aodbm_version version, aodbm_data *key) {
     return aodbm_search_recursive(db, version + 8, key);
 }
 
-struct aodbm_path {
-    aodbm_path *up;
-    aodbm_path_node node;
+struct aodbm_stack {
+    aodbm_stack *up;
+    void *dat;
 };
 
-void aodbm_path_print(aodbm_path *path) {
-    aodbm_path *it;
-    printf("[");
-    for (it = path; it->up != NULL; it = it->up) {
-        printf("%llu, ", (long long unsigned int)it->node.node);
-    }
-    printf("%llu]", (long long unsigned int)it->node.node);
+void aodbm_stack_push(aodbm_stack **stack, void *data) {
+    aodbm_stack *new = malloc(sizeof(aodbm_stack));
+    new->dat = data;
+    new->up = *stack;
+    *stack = new;
 }
 
-void aodbm_path_push(aodbm_path **path, aodbm_path_node node) {
-    aodbm_path *new = malloc(sizeof(aodbm_path));
-    new->node = node;
-    if (*path == NULL) {
-        new->up = NULL;
-    } else {
-        new->up = *path;
+void *aodbm_stack_pop(aodbm_stack **stack) {
+    if (*stack == NULL) {
+        return NULL;
     }
-    *path = new;
-}
-
-aodbm_path_node aodbm_path_pop(aodbm_path **path) {
-    if (*path == NULL) {
-        AODBM_CUSTOM_ERROR("cannot pop an empty aodbm_path");
-    } else {
-        aodbm_path_node result = (*path)->node;
-        aodbm_path *fr = *path;
-        *path = (*path)->up;
-        free(fr);
-        return result;
-    }
+    aodbm_stack *next = (*stack)->up;
+    void *out = (*stack)->dat;
+    free(*stack);
+    *stack = next;
+    return out;
 }
 
 void aodbm_search_path_recursive(aodbm *db,
                                  uint64_t node,
                                  aodbm_data *node_key,
                                  aodbm_data *key,
-                                 aodbm_path **path) {
+                                 aodbm_stack **path) {
     assert (aodbm_data_le(node_key, key));
-    aodbm_path_node path_node = {node_key, node};
-    aodbm_path_push(path, path_node);
+    aodbm_path_node *path_node = malloc(sizeof(aodbm_path_node));
+    path_node->key = node_key;
+    path_node->node = node;
+    aodbm_stack_push(path, (void *)path_node);
     
     char type;
     aodbm_read(db, node, 1, &type);
@@ -354,18 +342,11 @@ void aodbm_search_path_recursive(aodbm *db,
     }
 }
 
-aodbm_path *aodbm_search_path(aodbm *db, aodbm_version ver, aodbm_data *key) {
+aodbm_stack *aodbm_search_path(aodbm *db, aodbm_version ver, aodbm_data *key) {
     if (ver == 0) {
         AODBM_CUSTOM_ERROR("error, given the 0 version for a search");
     }
-    aodbm_path *path = NULL;
+    aodbm_stack *path = NULL;
     aodbm_search_path_recursive(db, ver + 8, aodbm_data_empty(), key, &path);
     return path;
-}
-
-void aodbm_free_path(aodbm_path **path) {
-    while (*path != NULL) {
-        aodbm_path_node node = aodbm_path_pop(path);
-        aodbm_free_data(node.key);
-    }
 }

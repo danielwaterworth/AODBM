@@ -22,13 +22,17 @@ class Data(ctypes.Structure):
     _fields_ = [("dat", ctypes.c_char_p),
                 ("sz", ctypes.c_size_t)]
 
+data_ptr = ctypes.POINTER(Data)
+
+class Record(ctypes.Structure):
+    _fields_ = [("key", data_ptr),
+                ("val", data_ptr)]
+
 def str_to_data(st):
     return Data(st, len(st))
 
 def data_to_str(dat):
     return ctypes.string_at(dat.dat, dat.sz)
-
-data_ptr = ctypes.POINTER(Data)
 
 aodbm_lib = ctypes.CDLL("./libaodbm.so")
 
@@ -62,6 +66,39 @@ aodbm_lib.aodbm_is_based_on.restype = ctypes.c_bool
 aodbm_lib.aodbm_previous_version.argtypes = [ctypes.c_void_p, ctypes.c_uint64]
 aodbm_lib.aodbm_previous_version.restype = ctypes.c_uint64
 
+aodbm_lib.aodbm_new_iterator.argtypes = [ctypes.c_void_p, ctypes.c_uint64]
+aodbm_lib.aodbm_new_iterator.restype = ctypes.c_void_p
+
+aodbm_lib.aodbm_free_iterator.argtypes = [ctypes.c_void_p]
+aodbm_lib.aodbm_free_iterator.restype = None
+
+aodbm_lib.aodbm_iterator_next.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
+aodbm_lib.aodbm_iterator_next.restype = Record
+
+aodbm_lib.aodbm_free_data.argtypes = [ctypes.c_void_p]
+aodbm_lib.aodbm_free_data.restype = None
+
+class VersionIterator(object):
+    def __init__(self, version):
+        self.version = version
+        self.it = aodbm_lib.aodbm_new_iterator(version.db.db, version.version)
+    
+    def __del__(self):
+        aodbm_lib.aodbm_free_iterator(self.it)
+    
+    def __iter__(self):
+        return self
+    
+    def next(self):
+        rec = aodbm_lib.aodbm_iterator_next(self.version.db.db, self.it)
+        if rec.key:
+            key = data_to_str(rec.key.contents)
+            val = data_to_str(rec.val.contents)
+            aodbm_lib.aodbm_free_data(rec.key)
+            aodbm_lib.aodbm_free_data(rec.val)
+            return key, val
+        raise StopIteration()
+
 class Version(object):
     '''Represents a version of the database'''
     def __init__(self, db, version):
@@ -77,7 +114,9 @@ class Version(object):
         '''Queries the version for a key'''
         ptr = aodbm_lib.aodbm_get(self.db.db, self.version, str_to_data(key))
         if ptr:
-            return data_to_str(ptr.contents)
+            out = data_to_str(ptr.contents)
+            aodbm_lib.aodbm_free_data(ptr)
+            return out
         raise KeyError()
     
     def __setitem__(self, key, val):
@@ -110,6 +149,9 @@ class Version(object):
         '''Is this object based on other?'''
         assert self.db == other.db
         return aodbm_lib.aodbm_is_based_on(self.db.db, self.version, other.version)
+
+    def __iter__(self):
+        return VersionIterator(self)
 
 class AODBM(object):
     '''Represents a Database'''

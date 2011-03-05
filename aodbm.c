@@ -648,16 +648,20 @@ aodbm_version aodbm_set(aodbm *db,
         } else if (type = 'b') {
             aodbm_rope *data = aodbm_rope_empty();
             uint32_t data_sz = 0;
-            aodbm_path *path = aodbm_search_path(db, ver, key);
+            aodbm_stack *path = aodbm_search_path(db, ver, key);
             /* pop the leaf node */
-            aodbm_path_node node = aodbm_path_pop(&path);
+            aodbm_path_node *ptr = aodbm_stack_pop(&path);
+            aodbm_path_node node = *ptr;
+            free(ptr);
             modify_result nodes = insert_into_leaf(db, key, val, node.node + 1);
             uint64_t prev_node = node.node;
             
             uint64_t a, b;
             
             while (path != NULL) {
-                node = aodbm_path_pop(&path);
+                ptr = aodbm_stack_pop(&path);
+                node = *ptr;
+                free(ptr);
                 
                 uint64_t a_sz, b_sz;
                 a_sz = aodbm_rope_size(nodes.a_node);
@@ -723,17 +727,21 @@ aodbm_version aodbm_del(aodbm *db, aodbm_version ver, aodbm_data *key) {
         /* TODO: modify to merge nodes */
         aodbm_rope *data = aodbm_rope_empty();
         uint64_t data_sz = 0;
-        aodbm_path *path = aodbm_search_path(db, ver, key);
+        aodbm_stack *path = aodbm_search_path(db, ver, key);
         
         /* pop the leaf node */
-        aodbm_path_node node = aodbm_path_pop(&path);
+        aodbm_path_node *ptr = aodbm_stack_pop(&path);
+        aodbm_path_node node = *ptr;
+        free(ptr);
         modify_result nodes = remove_from_leaf(db, key, node.node + 1);
         uint64_t prev_node = node.node;
         
         uint64_t a, b;
         
         while (path != NULL) {
-            node = aodbm_path_pop(&path);
+            ptr = aodbm_stack_pop(&path);
+            node = *ptr;
+            free(ptr);
             
             if (nodes.a_key == NULL) {
                 a = 0;
@@ -858,18 +866,112 @@ aodbm_version aodbm_previous_version(aodbm *db, aodbm_version ver) {
 }
 
 struct aodbm_iterator {
-    aodbm_path *path;
+    aodbm_stack *path;
 };
+
+typedef struct {
+    uint64_t pos;
+    uint32_t n;
+    uint32_t sz;
+} it_node_info;
+
+void construct_iterator(aodbm *db, aodbm_iterator *it, uint64_t node) {
+    char type;
+    aodbm_read(db, node, 1, &type);
+    
+    uint32_t size = aodbm_read32(db, node + 1);
+    
+    it_node_info *info = malloc(sizeof(it_node_info));
+    info->sz = size;
+    info->n = 0;
+    
+    if (type == 'l') {
+        info->pos = node + 5;
+        aodbm_stack_push(&it->path, info);
+    } else if (type == 'b') {
+        uint64_t n = aodbm_read64(db, node + 5);
+        
+        info->pos = node + 13;
+        aodbm_stack_push(&it->path, info);
+        
+        construct_iterator(db, it, n);
+    } else {
+        AODBM_CUSTOM_ERROR("unknown node type");
+    }
+}
 
 aodbm_iterator *aodbm_new_iterator(aodbm *db, aodbm_version ver) {
     /* create the path of the first record */
+    aodbm_iterator *it = malloc(sizeof(aodbm_iterator));
+    it->path = NULL;
+    
+    if (ver != 0) {
+        construct_iterator(db, it, ver + 8);
+    }
+    
+    return it;
 }
 
 void aodbm_free_iterator(aodbm_iterator *it) {
-    aodbm_free_path(&it->path);
+    while (it->path != NULL) {
+        free(aodbm_stack_pop(&it->path));
+    }
     free(it);
 }
 
 aodbm_record aodbm_iterator_next(aodbm *db, aodbm_iterator *it) {
+    aodbm_record output;
     
+    if (it->path == NULL) {
+        output.key = NULL;
+        output.val = NULL;
+        return output;
+    }
+    
+    it_node_info *leaf = aodbm_stack_pop(&it->path);
+    
+    if (leaf->n == leaf->sz) {
+        /* advance to the next leaf node */
+        while (it->path != NULL) {
+            it_node_info *branch = aodbm_stack_pop(&it->path);
+            
+            if (branch->n < branch->sz) {
+                /* advance the branch and construct the stack */
+                aodbm_data *key = aodbm_read_data(db, branch->pos);
+                branch->pos += 4 + key->sz;
+                aodbm_free_data(key);
+                
+                uint64_t node = aodbm_read64(db, branch->pos);
+                branch->pos += 8;
+                
+                branch->n += 1;
+                
+                aodbm_stack_push(&it->path, branch);
+                
+                /* travel back down the stack */
+                construct_iterator(db, it, node);
+                
+                free(leaf);
+                leaf = aodbm_stack_pop(&it->path);
+                break;
+            }
+            
+            free(branch);
+        }
+        if (it->path == NULL) {
+            output.key = NULL;
+            output.val = NULL;
+            return output;
+        }
+    }
+    
+    output.key = aodbm_read_data(db, leaf->pos);
+    leaf->pos += 4 + output.key->sz;
+    output.val = aodbm_read_data(db, leaf->pos);
+    leaf->pos += 4 + output.val->sz;
+    leaf->n += 1;
+    
+    aodbm_stack_push(&it->path, leaf);
+    
+    return output;
 }

@@ -69,14 +69,12 @@ struct aodbm_path_node {
 
 typedef struct aodbm_path_node aodbm_path_node;
 
-struct aodbm_path;
-typedef struct aodbm_path aodbm_path;
+struct aodbm_stack;
+typedef struct aodbm_stack aodbm_stack;
 
-void aodbm_path_push(aodbm_path **, aodbm_path_node);
-aodbm_path_node aodbm_path_pop(aodbm_path **);
-void aodbm_path_print(aodbm_path *);
-void aodbm_free_path(aodbm_path **);
+void aodbm_stack_push(aodbm_stack **, void *);
+void *aodbm_stack_pop(aodbm_stack **);
 
-aodbm_path *aodbm_search_path(aodbm *, aodbm_version, aodbm_data *);
+aodbm_stack *aodbm_search_path(aodbm *, aodbm_version, aodbm_data *);
 
 #endif
