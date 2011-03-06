@@ -865,6 +865,23 @@ aodbm_version aodbm_previous_version(aodbm *db, aodbm_version ver) {
     return aodbm_read64(db, ver);
 }
 
+aodbm_version aodbm_common_ancestor(aodbm *db,
+                                    aodbm_version a,
+                                    aodbm_version b) {
+    if (a == b) {
+        return a;
+    }
+    if (a == 0 || b == 0) {
+        return 0;
+    }
+    if (a > b) {
+        return aodbm_common_ancestor(db, aodbm_previous_version(db, a), b);
+    }
+    if (b > a) {
+        return aodbm_common_ancestor(db, a, aodbm_previous_version(db, b));
+    }
+}
+
 struct aodbm_iterator {
     aodbm_stack *path;
 };

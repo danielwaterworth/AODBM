@@ -52,6 +52,7 @@ aodbm_version aodbm_del(aodbm *, aodbm_version, aodbm_data *);
 
 bool aodbm_is_based_on(aodbm *, aodbm_version, aodbm_version);
 aodbm_version aodbm_previous_version(aodbm *, aodbm_version);
+aodbm_version aodbm_common_ancestor(aodbm *, aodbm_version, aodbm_version);
 
 /* iteration API */
 struct aodbm_iterator;
