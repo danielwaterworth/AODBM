@@ -66,8 +66,10 @@ struct aodbm_record {
 typedef struct aodbm_record aodbm_record;
 
 aodbm_iterator *aodbm_new_iterator(aodbm *, aodbm_version);
-void aodbm_free_iterator(aodbm_iterator *);
+aodbm_iterator *aodbm_iterate_from(aodbm *, aodbm_version, aodbm_data *);
 aodbm_record aodbm_iterator_next(aodbm *, aodbm_iterator *);
+void aodbm_iterator_goto(aodbm *, aodbm_iterator *it, aodbm_data *);
+void aodbm_free_iterator(aodbm_iterator *);
 
 void aodbm_free_data(aodbm_data *);
 

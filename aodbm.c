@@ -884,6 +884,7 @@ aodbm_version aodbm_common_ancestor(aodbm *db,
 
 struct aodbm_iterator {
     aodbm_stack *path;
+    aodbm_version ver;
 };
 
 typedef struct {
@@ -921,10 +922,94 @@ aodbm_iterator *aodbm_new_iterator(aodbm *db, aodbm_version ver) {
     /* create the path of the first record */
     aodbm_iterator *it = malloc(sizeof(aodbm_iterator));
     it->path = NULL;
+    it->ver = ver;
     
     if (ver != 0) {
         construct_iterator(db, it, ver + 8);
     }
+    
+    return it;
+}
+
+void aodbm_iterator_goto_recursive(aodbm *db,
+                                   aodbm_iterator *it,
+                                   aodbm_data *key,
+                                   uint64_t node) {
+    char type;
+    aodbm_read(db, node, 1, &type);
+    
+    uint32_t size = aodbm_read32(db, node + 1);
+    
+    it_node_info *info = malloc(sizeof(it_node_info));
+    info->sz = size;
+    
+    uint32_t n;
+    uint64_t pos = node + 5;
+    
+    if (type == 'l') {
+        for (n = 0; n < size; ++n) {
+            aodbm_data *s_key = aodbm_read_data(db, pos);
+            
+            if (aodbm_data_le(key, s_key)) {
+                aodbm_free_data(s_key);
+                break;
+            }
+            
+            pos += 4 + s_key->sz;
+            aodbm_free_data(s_key);
+            aodbm_data *s_val = aodbm_read_data(db, pos);
+            pos += 4 + s_val->sz;
+            aodbm_free_data(s_val);
+        }
+        
+        info->pos = pos;
+        info->n = n;
+        aodbm_stack_push(&it->path, info);
+    } else if (type == 'b') {
+        uint64_t off = aodbm_read64(db, pos);
+        pos += 8;
+        
+        for (n = 0; n < size; ++n) {
+            aodbm_data *s_key = aodbm_read_data(db, pos);
+            
+            if (aodbm_data_lt(key, s_key)) {
+                aodbm_free_data(s_key);
+                break;
+            }
+            
+            pos += 4 + s_key->sz;        
+            aodbm_free_data(s_key);
+            off = aodbm_read64(db, pos);
+            pos += 8;
+        }
+        
+        info->pos = pos;
+        info->n = n;
+        aodbm_stack_push(&it->path, info);
+        
+        aodbm_iterator_goto_recursive(db, it, key, off);
+    } else {
+        AODBM_CUSTOM_ERROR("unknown node type");
+    }
+}
+
+void aodbm_iterator_goto(aodbm *db,
+                         aodbm_iterator *it,
+                         aodbm_data *key) {
+    while (it->path != NULL) {
+        free(aodbm_stack_pop(&it->path));
+    }
+    aodbm_iterator_goto_recursive(db, it, key, it->ver + 8);
+}
+
+aodbm_iterator *aodbm_iterate_from(aodbm *db,
+                                   aodbm_version ver,
+                                   aodbm_data *key) {
+    aodbm_iterator *it = malloc(sizeof(aodbm_iterator));
+    it->path = NULL;
+    it->ver = ver;
+    
+    aodbm_iterator_goto(db, it, key);
     
     return it;
 }

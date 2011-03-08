@@ -69,19 +69,28 @@ aodbm_lib.aodbm_previous_version.restype = ctypes.c_uint64
 aodbm_lib.aodbm_new_iterator.argtypes = [ctypes.c_void_p, ctypes.c_uint64]
 aodbm_lib.aodbm_new_iterator.restype = ctypes.c_void_p
 
-aodbm_lib.aodbm_free_iterator.argtypes = [ctypes.c_void_p]
-aodbm_lib.aodbm_free_iterator.restype = None
+aodbm_lib.aodbm_iterate_from.argtypes = [ctypes.c_void_p, ctypes.c_uint64, data_ptr]
+aodbm_lib.aodbm_iterate_from.restype = ctypes.c_void_p
+
+aodbm_lib.aodbm_iterator_goto.argtypes = [ctypes.c_void_p, ctypes.c_void_p, data_ptr]
+aodbm_lib.aodbm_iterator_goto.restype = None
 
 aodbm_lib.aodbm_iterator_next.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
 aodbm_lib.aodbm_iterator_next.restype = Record
+
+aodbm_lib.aodbm_free_iterator.argtypes = [ctypes.c_void_p]
+aodbm_lib.aodbm_free_iterator.restype = None
 
 aodbm_lib.aodbm_free_data.argtypes = [ctypes.c_void_p]
 aodbm_lib.aodbm_free_data.restype = None
 
 class VersionIterator(object):
-    def __init__(self, version):
+    def __init__(self, version, it=None):
         self.version = version
-        self.it = aodbm_lib.aodbm_new_iterator(version.db.db, version.version)
+        if it:
+            self.it = it
+        else:
+            self.it = aodbm_lib.aodbm_new_iterator(version.db.db, version.version)
     
     def __del__(self):
         aodbm_lib.aodbm_free_iterator(self.it)
@@ -98,6 +107,9 @@ class VersionIterator(object):
             aodbm_lib.aodbm_free_data(rec.val)
             return key, val
         raise StopIteration()
+    
+    def goto(self, key):
+        self.it = aodbm_lib.aodbm_iterator_goto(self.version.db.db, self.it, str_to_data(key))
 
 class Version(object):
     '''Represents a version of the database'''
@@ -152,6 +164,9 @@ class Version(object):
 
     def __iter__(self):
         return VersionIterator(self)
+    
+    def iterate_from(self, key):
+        return VersionIterator(self, aodbm_lib.aodbm_iterate_from(self.db.db, self.version, str_to_data(key)))
 
 class AODBM(object):
     '''Represents a Database'''
