@@ -274,29 +274,6 @@ uint64_t aodbm_search(aodbm *db, aodbm_version version, aodbm_data *key) {
     return aodbm_search_recursive(db, version + 8, key);
 }
 
-struct aodbm_stack {
-    aodbm_stack *up;
-    void *dat;
-};
-
-void aodbm_stack_push(aodbm_stack **stack, void *data) {
-    aodbm_stack *new = malloc(sizeof(aodbm_stack));
-    new->dat = data;
-    new->up = *stack;
-    *stack = new;
-}
-
-void *aodbm_stack_pop(aodbm_stack **stack) {
-    if (*stack == NULL) {
-        return NULL;
-    }
-    aodbm_stack *next = (*stack)->up;
-    void *out = (*stack)->dat;
-    free(*stack);
-    *stack = next;
-    return out;
-}
-
 void aodbm_search_path_recursive(aodbm *db,
                                  uint64_t node,
                                  aodbm_data *node_key,

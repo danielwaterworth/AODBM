@@ -16,13 +16,14 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef AODBM_INTERNAL
-#define AODBM_INTERNAL
+#ifndef AODBM_INTERNAL_H
+#define AODBM_INTERNAL_H
 
 #include "aodbm.h"
 #include "aodbm_data.h"
 #include "aodbm_rope.h"
 #include "aodbm_rwlock.h"
+#include "aodbm_stack.h"
 
 struct aodbm {
     uint64_t file_size;
@@ -68,12 +69,6 @@ struct aodbm_path_node {
 };
 
 typedef struct aodbm_path_node aodbm_path_node;
-
-struct aodbm_stack;
-typedef struct aodbm_stack aodbm_stack;
-
-void aodbm_stack_push(aodbm_stack **, void *);
-void *aodbm_stack_pop(aodbm_stack **);
 
 aodbm_stack *aodbm_search_path(aodbm *, aodbm_version, aodbm_data *);
 
