@@ -18,16 +18,15 @@
 
 #define AODBM_HASH_BUCKETS 5
 
-#include "aodbm_hash.c"
+#include "aodbm_hash.h"
 
-#include "stdint.h"
 #include "stdlib.h"
 
 struct aodbm_hash {
     void **data;
     unsigned int sz;
-    unsigned int (hash_function*)(void *);
-    bool (eq*)(void *, void *);
+    unsigned int (*hash_function)(void *);
+    bool (*eq)(void *, void *);
 };
 
 static uint32_t hash(uint32_t a){
@@ -39,9 +38,10 @@ static uint32_t hash(uint32_t a){
    a = (a^0xb55a4f09) ^ (a>>16);
    return a;
 }
+
 aodbm_hash *aodbm_new_hash(unsigned int sz,
-                           unsigned int (hash_function*)(void *),
-                           bool (eq*)(void *, void *)) {
+                           unsigned int (*hash_function)(void *),
+                           bool (*eq)(void *, void *)) {
     aodbm_hash *hash = malloc(sizeof(aodbm_hash));
     hash->sz = sz;
     hash->hash_function = hash_function;
@@ -71,21 +71,21 @@ void aodbm_hash_insert(aodbm_hash *ht, void *val) {
     unsigned int old_sz = ht->sz;
     ht->sz = ht->sz * 2;
     for (i = 0; i < ht->sz; ++i) {
-        hash->data[i].dat = NULL;
-        hash->data[i].key = 0;
+        ht->data[i] = NULL;
     }
     for (i = 0; i < old_sz; ++i) {
         void *b = old[i];
         if (b != NULL) {
-            aodbm_insert(ht, b);
+            aodbm_hash_insert(ht, b);
         }
     }
     free(old);
 }
 
-void aodbm_hash_del(aodbm *ht, void *data) {
+void aodbm_hash_del(aodbm_hash *ht, void *data) {
     unsigned int key = ht->hash_function(data);
     unsigned int orig_key = key;
+    unsigned int i;
     for (i = 0; i < AODBM_HASH_BUCKETS; ++i) {
         void **b = &ht->data[key % ht->sz];
         if (ht->eq(data, *b)) {

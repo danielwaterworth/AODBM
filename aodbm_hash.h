@@ -19,6 +19,9 @@
 #ifndef AODBM_HASH_H
 #define AODBM_HASH_H
 
+#include "stdint.h"
+#include "stdbool.h"
+
 struct aodbm_hash;
 typedef struct aodbm_hash aodbm_hash;
 
