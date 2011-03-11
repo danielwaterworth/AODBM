@@ -1,5 +1,7 @@
-srcs = aodbm.c aodbm_data.c aodbm_rope.c aodbm_internal.c aodbm_rwlock.c
-objs = aodbm.o aodbm_data.o aodbm_rope.o aodbm_internal.o aodbm_rwlock.o
+srcs = aodbm.c aodbm_data.c aodbm_rope.c aodbm_internal.c aodbm_rwlock.c \
+       aodbm_stack.c
+objs = aodbm.o aodbm_data.o aodbm_rope.o aodbm_internal.o aodbm_rwlock.o \
+       aodbm_stack.o
 flags = -g -lpthread -D_FILE_OFFSET_BITS=64 #-DAODBM_USE_MMAP
 
 all:
