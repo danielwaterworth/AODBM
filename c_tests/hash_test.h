@@ -1,4 +1,4 @@
-'''  
+/*  
     aodbm - Append Only Database Manager
     Copyright (C) 2011 Daniel Waterworth
 
@@ -14,10 +14,8 @@
 
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
-'''
+*/
 
-import unittest, python_tests, os
+#include "check.h"
 
-if __name__ == '__main__':
-    unittest.TextTestRunner().run(python_tests.tests)
-    os.remove("testdb")
+TCase *hash_test_case();

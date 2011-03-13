@@ -1,4 +1,4 @@
-'''  
+/*  
     aodbm - Append Only Database Manager
     Copyright (C) 2011 Daniel Waterworth
 
@@ -14,10 +14,28 @@
 
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
-'''
+*/
 
-import unittest, python_tests, os
+#include "hash_test.h"
+#include "aodbm_hash.h"
 
-if __name__ == '__main__':
-    unittest.TextTestRunner().run(python_tests.tests)
-    os.remove("testdb")
+unsigned int hash_int(void *item) {
+    return (unsigned int)item;
+}
+
+bool cmp_int(void *a, void *b) {
+    return a == b;
+}
+
+START_TEST (test_1) {
+    aodbm_hash *ht = aodbm_new_hash(0, hash_int, cmp_int);
+    aodbm_hash_insert(ht, (void *)10);
+    fail_unless(aodbm_hash_get(ht, (void *)10) == (void *)10, NULL);
+    aodbm_free_hash(ht);
+} END_TEST
+
+TCase *hash_test_case() {
+    TCase *tc = tcase_create("hash table");
+    tcase_add_test(tc, test_1);
+    return tc;
+}

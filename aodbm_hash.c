@@ -42,6 +42,9 @@ static uint32_t hash(uint32_t a){
 aodbm_hash *aodbm_new_hash(unsigned int sz,
                            unsigned int (*hash_function)(void *),
                            bool (*eq)(void *, void *)) {
+    if (sz == 0) {
+        sz = 16;
+    }
     aodbm_hash *hash = malloc(sizeof(aodbm_hash));
     hash->sz = sz;
     hash->hash_function = hash_function;
@@ -62,7 +65,7 @@ void aodbm_hash_insert(aodbm_hash *ht, void *val) {
         void **b = &ht->data[key % ht->sz];
         if (*b == NULL) {
             *b = val;
-            break;
+            return;
         }
         key = hash(key);
     }

@@ -3,4 +3,4 @@ testdb
 *.pyc
 *.so
 *.a
-aodbm_test
+run_c_tests
