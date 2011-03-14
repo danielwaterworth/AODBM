@@ -19,6 +19,8 @@
 #ifndef AODBM_ROPE_H
 #define AODBM_ROPE_H
 
+#include "aodbm.h"
+
 /* this type is used to make merging aodbm_data objects cheaper */
 /* implementation note:
      internally it is just a list of aodbm_data objects,

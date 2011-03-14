@@ -19,6 +19,11 @@
 #ifndef AODBM_DATA_H
 #define AODBM_DATA_H
 
+#include "stdint.h"
+#include "stdbool.h"
+
+#include "aodbm.h"
+
 /* NOTE: functions ending in di have destructive input */
 
 /* aodbm_data functions */
