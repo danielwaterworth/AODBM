@@ -16,27 +16,15 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <check.h>
-
-#include "hash_test.h"
-#include "data_test.h"
-#include "rope_test.h"
-#include "stack_test.h"
 #include "rwlock_test.h"
+#include "aodbm_rwlock.h"
 
-int main(void) {
-    int number_failed;
-    Suite *s = suite_create("Main");
-    
-    suite_add_tcase(s, hash_test_case());
-    suite_add_tcase(s, data_test_case());
-    suite_add_tcase(s, rope_test_case());
-    suite_add_tcase(s, stack_test_case());
-    suite_add_tcase(s, rwlock_test_case());
-    
-    SRunner *sr = srunner_create(s);
-    srunner_run_all(sr, CK_NORMAL);
-    number_failed = srunner_ntests_failed(sr);
-    srunner_free(sr);
-    return (number_failed == 0) ? 0 : 1;
+START_TEST (test_1) {
+
+} END_TEST
+
+TCase *rwlock_test_case() {
+    TCase *tc = tcase_create("rwlock");
+    tcase_add_test(tc, test_1);
+    return tc;
 }
