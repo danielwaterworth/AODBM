@@ -20,7 +20,18 @@
 #include "aodbm_stack.h"
 
 START_TEST (test_1) {
-
+    aodbm_stack *st = NULL;
+    aodbm_stack_push(&st, (void *)10);
+    fail_unless(st != NULL, NULL);
+    fail_unless(aodbm_stack_pop(&st) == (void *)10, NULL);
+    fail_unless(st == NULL, NULL);
+    aodbm_stack_push(&st, (void *)10);
+    aodbm_stack_push(&st, (void *)20);
+    aodbm_stack_push(&st, (void *)30);
+    fail_unless(aodbm_stack_pop(&st) == (void *)30, NULL);
+    fail_unless(aodbm_stack_pop(&st) == (void *)20, NULL);
+    fail_unless(aodbm_stack_pop(&st) == (void *)10, NULL);
+    fail_unless(st == NULL, NULL);
 } END_TEST
 
 TCase *stack_test_case() {

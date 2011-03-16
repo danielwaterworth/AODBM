@@ -14,6 +14,6 @@ all:
 
 check: all
 	gcc ${test_srcs} aodbm_test.c libaodbm.a -o run_c_tests ${flags} -lcheck \
-	-I./c_tests/ -I./
+	-lpthread -I./c_tests/ -I./
 	python aodbm_test.py
 	./run_c_tests

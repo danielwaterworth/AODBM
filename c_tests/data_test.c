@@ -20,7 +20,7 @@
 #include "aodbm_data.h"
 
 START_TEST (test_1) {
-
+    
 } END_TEST
 
 TCase *data_test_case() {

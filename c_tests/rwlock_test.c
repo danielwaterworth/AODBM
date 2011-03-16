@@ -19,8 +19,47 @@
 #include "rwlock_test.h"
 #include "aodbm_rwlock.h"
 
-START_TEST (test_1) {
+#include "stdbool.h"
+#include "pthread.h"
 
+typedef struct {
+    aodbm_rwlock_t *lock;
+    volatile bool *locked;
+} lock_data;
+
+static void *obtain_wrlock(void *ptr) {
+    lock_data *dat = (lock_data *)ptr;
+    
+    fail_unless(*dat->locked);
+    aodbm_rwlock_wrlock(dat->lock);
+    fail_unless(*dat->locked == false);
+    aodbm_rwlock_unlock(dat->lock);
+    
+    return NULL;
+}
+
+START_TEST (test_1) {
+    pthread_t thread;
+    aodbm_rwlock_t lock;
+    aodbm_rwlock_init(&lock);
+    
+    aodbm_rwlock_rdlock(&lock);
+    fail_unless(aodbm_rwlock_tryrdlock(&lock));
+    aodbm_rwlock_unlock(&lock);
+    
+    volatile bool locked = true;
+    
+    lock_data dat;
+    dat.lock = &lock;
+    dat.locked = &locked;
+    
+    fail_unless(aodbm_rwlock_trywrlock(&lock) == false);
+    
+    pthread_create(&thread, NULL, obtain_wrlock, (void *)&dat);
+    locked = false;
+    aodbm_rwlock_unlock(&lock);
+    
+    aodbm_rwlock_destroy(&lock);
 } END_TEST
 
 TCase *rwlock_test_case() {
