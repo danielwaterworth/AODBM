@@ -22,6 +22,8 @@
 #ifndef AODBM
 #define AODBM
 
+#include "aodbm_changeset.h"
+
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -53,6 +55,10 @@ aodbm_version aodbm_del(aodbm *, aodbm_version, aodbm_data *);
 bool aodbm_is_based_on(aodbm *, aodbm_version, aodbm_version);
 aodbm_version aodbm_previous_version(aodbm *, aodbm_version);
 aodbm_version aodbm_common_ancestor(aodbm *, aodbm_version, aodbm_version);
+
+aodbm_changeset aodbm_diff(aodbm *, aodbm_version, aodbm_version);
+aodbm_version aodbm_apply(aodbm *, aodbm_version, aodbm_changeset);
+aodbm_version aodbm_merge(aodbm *, aodbm_version, aodbm_version);
 
 /* iteration API */
 struct aodbm_iterator;
