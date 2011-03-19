@@ -1,3 +1,7 @@
+#include "stdlib.h"
+#include "assert.h"
+#include "stdio.h"
+
 #define AODBM_OS_ERROR() \
 do { \
 printf("\nfailed at %s:%i\n", __FILE__, __LINE__); \
