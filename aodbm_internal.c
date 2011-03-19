@@ -145,7 +145,6 @@ void aodbm_write_data_block(aodbm *db, aodbm_data *data) {
     uint32_t sz = htonl(data->sz);
     aodbm_write_bytes(db, &sz, 4);
     aodbm_write_bytes(db, data->dat, data->sz);
-    fflush(db->fd);
     pthread_mutex_unlock(&db->rw);
 }
 
