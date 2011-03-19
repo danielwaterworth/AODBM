@@ -20,7 +20,6 @@
 #include "aodbm_error.h"
 
 #include "stdlib.h"
-#include "assert.h"
 
 struct list_node {
     struct list_node *next, *prev;

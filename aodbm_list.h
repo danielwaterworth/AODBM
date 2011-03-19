@@ -20,6 +20,7 @@
 #define AODBM_LIST_H
 
 #include "stdbool.h"
+#include "stdlib.h"
 
 struct aodbm_list;
 typedef struct aodbm_list aodbm_list;
