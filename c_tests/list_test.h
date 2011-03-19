@@ -16,29 +16,6 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <check.h>
+#include "check.h"
 
-#include "hash_test.h"
-#include "data_test.h"
-#include "rope_test.h"
-#include "stack_test.h"
-#include "rwlock_test.h"
-#include "list_test.h"
-
-int main(void) {
-    int number_failed;
-    Suite *s = suite_create("Main");
-    
-    suite_add_tcase(s, hash_test_case());
-    suite_add_tcase(s, data_test_case());
-    suite_add_tcase(s, rope_test_case());
-    suite_add_tcase(s, stack_test_case());
-    suite_add_tcase(s, rwlock_test_case());
-    suite_add_tcase(s, list_test_case());
-    
-    SRunner *sr = srunner_create(s);
-    srunner_run_all(sr, CK_NORMAL);
-    number_failed = srunner_ntests_failed(sr);
-    srunner_free(sr);
-    return (number_failed == 0) ? 0 : 1;
-}
+TCase *list_test_case();

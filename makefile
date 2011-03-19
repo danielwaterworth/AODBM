@@ -1,10 +1,10 @@
 srcs = aodbm.c aodbm_data.c aodbm_rope.c aodbm_internal.c aodbm_rwlock.c \
-       aodbm_stack.c aodbm_hash.c
+       aodbm_stack.c aodbm_hash.c aodbm_list.c
 objs = aodbm.o aodbm_data.o aodbm_rope.o aodbm_internal.o aodbm_rwlock.o \
-       aodbm_stack.o aodbm_hash.o
+       aodbm_stack.o aodbm_hash.o aodbm_list.o
 flags = -g -fPIC -lpthread -D_FILE_OFFSET_BITS=64 #-DAODBM_USE_MMAP
 test_srcs = c_tests/hash_test.c c_tests/data_test.c c_tests/rope_test.c \
-            c_tests/stack_test.c c_tests/rwlock_test.c
+            c_tests/stack_test.c c_tests/rwlock_test.c c_tests/list_test.c
 
 all:
 	gcc ${srcs} -c -I./ -D_GNU_SOURCE ${flags}
