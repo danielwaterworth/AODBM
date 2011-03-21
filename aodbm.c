@@ -1077,3 +1077,59 @@ aodbm_record aodbm_iterator_next(aodbm *db, aodbm_iterator *it) {
     
     return output;
 }
+
+/* Find the changeset that you would apply to the prev to get to ver */
+aodbm_changeset aodbm_diff_prev(aodbm *db, aodbm_version ver) {
+    assert(0);
+}
+
+/* Find the changeset that you would apply to ver to get to the prev */
+aodbm_changeset aodbm_diff_prev_rev(aodbm *db, aodbm_version ver) {
+    assert(0);
+}
+
+/* Find the changeset that you would apply to go from a to b */
+aodbm_changeset aodbm_diff(aodbm *db, aodbm_version a, aodbm_version b) {
+    aodbm_version c = aodbm_common_ancestor(db, a, b);
+    if (c != a && c != b) {
+        aodbm_changeset cb = aodbm_diff(db, c, b);
+        aodbm_changeset ac = aodbm_diff(db, a, c);
+        return aodbm_changeset_merge_di(ac, cb);
+    }
+    aodbm_changeset res;
+    
+    if (a < b) {
+        while (b != a) {
+            res = aodbm_changeset_merge_di(res, aodbm_diff_prev(db, b));
+            b = aodbm_previous_version(db, b);
+        }
+    } else if (b < a) {
+        while (a != b) {
+            res = aodbm_changeset_merge_di(res, aodbm_diff_prev_rev(db, a));
+            a = aodbm_previous_version(db, a);
+        }
+    }
+    
+    return res;
+}
+
+aodbm_version aodbm_apply(aodbm *db, aodbm_version ver, aodbm_changeset ch) {
+    assert(0);
+}
+
+aodbm_version aodbm_apply_di(aodbm *db, aodbm_version ver, aodbm_changeset ch) {
+    aodbm_version result = aodbm_apply(db, ver, ch);
+    aodbm_free_changeset(ch);
+    return result;
+}
+
+aodbm_version aodbm_merge(aodbm *db, aodbm_version a, aodbm_version b) {
+    aodbm_version c = aodbm_common_ancestor(db, a, b);
+    if (c == a) {
+        return b;
+    }
+    if (c == b) {
+        return a;
+    }
+    return aodbm_apply_di(db, a, aodbm_diff(db, c, b));
+}

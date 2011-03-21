@@ -17,7 +17,6 @@
 */
 
 #include "aodbm_changeset.h"
-#include "aodbm_list.h"
 #include "aodbm_data.h"
 #include "aodbm_error.h"
 
@@ -29,10 +28,6 @@ typedef struct {
     aodbm_data *key;
     aodbm_data *val;
 } change;
-
-struct aodbm_changeset {
-    aodbm_list *list;
-};
 
 static change *create_remove_di(aodbm_data *key) {
     change *c = malloc(1 + sizeof(aodbm_data *));
@@ -84,6 +79,7 @@ void aodbm_changeset_add_remove_di(aodbm_changeset changeset, aodbm_data *key) {
 aodbm_changeset aodbm_changeset_merge_di(aodbm_changeset a, aodbm_changeset b) {
     aodbm_changeset result;
     result.list = aodbm_list_merge_di(a.list, b.list);
+    /* TODO: remove unneeded changes */
     return result;
 }
 
