@@ -20,31 +20,22 @@
 #include "aodbm_data.h"
 #include "aodbm_error.h"
 
-#define AODBM_MODIFY 1
-#define AODBM_REMOVE 2
-
-typedef struct {
-    unsigned char type;
-    aodbm_data *key;
-    aodbm_data *val;
-} change;
-
-static change *create_remove_di(aodbm_data *key) {
-    change *c = malloc(1 + sizeof(aodbm_data *));
+static aodbm_change *create_remove_di(aodbm_data *key) {
+    aodbm_change *c = malloc(1 + sizeof(aodbm_data *));
     c->type = AODBM_REMOVE;
     c->key = key;
     return c;
 }
 
-static change *create_modify_di(aodbm_data *key, aodbm_data *val) {
-    change *c = malloc(sizeof(change));
+static aodbm_change *create_modify_di(aodbm_data *key, aodbm_data *val) {
+    aodbm_change *c = malloc(sizeof(aodbm_change));
     c->type = AODBM_MODIFY;
     c->key = key;
     c->val = val;
     return c;
 }
 
-static void free_change(change *c) {
+static void free_change(aodbm_change *c) {
     switch (c->type) {
         case AODBM_REMOVE:
             break;
@@ -67,12 +58,12 @@ aodbm_changeset aodbm_changeset_empty() {
 void aodbm_changeset_add_modify_di(aodbm_changeset changeset,
                                    aodbm_data *key,
                                    aodbm_data *val) {
-    change *c = create_modify_di(key, val);
+    aodbm_change *c = create_modify_di(key, val);
     aodbm_list_push_back(changeset.list, c);
 }
 
 void aodbm_changeset_add_remove_di(aodbm_changeset changeset, aodbm_data *key) {
-    change *c = create_remove_di(key);
+    aodbm_change *c = create_remove_di(key);
     aodbm_list_push_back(changeset.list, c);
 }
 

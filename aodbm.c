@@ -1114,7 +1114,20 @@ aodbm_changeset aodbm_diff(aodbm *db, aodbm_version a, aodbm_version b) {
 }
 
 aodbm_version aodbm_apply(aodbm *db, aodbm_version ver, aodbm_changeset ch) {
-    assert(0);
+    aodbm_list_iterator *it;
+    for (it = aodbm_list_begin(ch.list);
+         !aodbm_list_iterator_is_end(it);
+         aodbm_list_iterator_next(it)) {
+        aodbm_change *change = aodbm_list_iterator_get(it);
+        if (change->type == AODBM_MODIFY) {
+            ver = aodbm_set(db, ver, change->key, change->val);
+        } else if (change->type = AODBM_REMOVE) {
+            ver = aodbm_del(db, ver, change->key);
+        } else {
+            AODBM_CUSTOM_ERROR("unknown change type");
+        }
+    }
+    return ver;
 }
 
 aodbm_version aodbm_apply_di(aodbm *db, aodbm_version ver, aodbm_changeset ch) {

@@ -19,9 +19,19 @@
 #ifndef AODBM_CHANGESET_H
 #define AODBM_CHANGESET_H
 
+#define AODBM_MODIFY 1
+#define AODBM_REMOVE 2
+
 #include "aodbm_list.h"
 
 struct aodbm_data;
+
+struct aodbm_change {
+    unsigned char type;
+    struct aodbm_data *key;
+    struct aodbm_data *val;
+};
+typedef struct aodbm_change aodbm_change;
 
 struct aodbm_changeset {
     aodbm_list *list;
