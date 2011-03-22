@@ -1116,7 +1116,7 @@ aodbm_changeset aodbm_diff(aodbm *db, aodbm_version a, aodbm_version b) {
 aodbm_version aodbm_apply(aodbm *db, aodbm_version ver, aodbm_changeset ch) {
     aodbm_list_iterator *it;
     for (it = aodbm_list_begin(ch.list);
-         !aodbm_list_iterator_is_end(it);
+         !aodbm_list_iterator_is_finished(it);
          aodbm_list_iterator_next(it)) {
         aodbm_change *change = aodbm_list_iterator_get(it);
         if (change->type == AODBM_MODIFY) {
@@ -1127,6 +1127,7 @@ aodbm_version aodbm_apply(aodbm *db, aodbm_version ver, aodbm_changeset ch) {
             AODBM_CUSTOM_ERROR("unknown change type");
         }
     }
+    aodbm_free_list_iterator(it);
     return ver;
 }
 

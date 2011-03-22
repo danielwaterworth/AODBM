@@ -16,31 +16,29 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <check.h>
-
-#include "hash_test.h"
-#include "data_test.h"
-#include "rope_test.h"
-#include "stack_test.h"
-#include "rwlock_test.h"
-#include "list_test.h"
 #include "changeset_test.h"
+#include "aodbm.h"
+#include "aodbm_data.h"
 
-int main(void) {
-    int number_failed;
-    Suite *s = suite_create("Main");
-    
-    suite_add_tcase(s, hash_test_case());
-    suite_add_tcase(s, data_test_case());
-    suite_add_tcase(s, rope_test_case());
-    suite_add_tcase(s, stack_test_case());
-    suite_add_tcase(s, rwlock_test_case());
-    suite_add_tcase(s, list_test_case());
-    suite_add_tcase(s, changeset_test_case());
-    
-    SRunner *sr = srunner_create(s);
-    srunner_run_all(sr, CK_NORMAL);
-    number_failed = srunner_ntests_failed(sr);
-    srunner_free(sr);
-    return (number_failed == 0) ? 0 : 1;
+START_TEST (test_1) {
+    aodbm_changeset set = aodbm_changeset_empty();
+    aodbm_data *key = aodbm_data_from_str("hello");
+    aodbm_data *val = aodbm_data_from_str("world");
+    aodbm_changeset_add_modify(set, key, val);
+    aodbm *db = aodbm_open("testdb", 0);
+    aodbm_version ver = aodbm_apply_di(db, 0, set);
+    fail_unless(ver != 0);
+    aodbm_data *r_val = aodbm_get(db, ver, key);
+    fail_unless(r_val != NULL, NULL);
+    fail_unless(aodbm_data_eq(r_val, val), NULL);
+    aodbm_free_data(key);
+    aodbm_free_data(val);
+    aodbm_free_data(r_val);
+    aodbm_close(db);
+} END_TEST
+
+TCase *changeset_test_case() {
+    TCase *tc = tcase_create("changeset");
+    tcase_add_test(tc, test_1);
+    return tc;
 }

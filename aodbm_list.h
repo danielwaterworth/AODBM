@@ -51,6 +51,9 @@ void aodbm_list_iterator_next(aodbm_list_iterator *);
 void aodbm_list_iterator_prev(aodbm_list_iterator *);
 bool aodbm_list_iterator_is_begin(aodbm_list_iterator *);
 bool aodbm_list_iterator_is_end(aodbm_list_iterator *);
+bool aodbm_list_iterator_is_finished(aodbm_list_iterator *);
 void *aodbm_list_iterator_get(aodbm_list_iterator *);
+
+void aodbm_free_list_iterator(aodbm_list_iterator *);
 
 #endif

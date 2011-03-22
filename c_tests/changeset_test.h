@@ -16,33 +16,6 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef AODBM_CHANGESET_H
-#define AODBM_CHANGESET_H
+#include "check.h"
 
-#define AODBM_MODIFY 1
-#define AODBM_REMOVE 2
-
-#include "aodbm_list.h"
-
-struct aodbm_data;
-
-struct aodbm_change {
-    unsigned char type;
-    struct aodbm_data *key;
-    struct aodbm_data *val;
-};
-typedef struct aodbm_change aodbm_change;
-
-struct aodbm_changeset {
-    aodbm_list *list;
-};
-typedef struct aodbm_changeset aodbm_changeset;
-
-aodbm_changeset aodbm_changeset_empty();
-void aodbm_changeset_add_modify
-    (aodbm_changeset, struct aodbm_data *, struct aodbm_data *);
-void aodbm_changeset_add_remove(aodbm_changeset, struct aodbm_data *);
-aodbm_changeset aodbm_changeset_merge_di(aodbm_changeset, aodbm_changeset);
-void aodbm_free_changeset(aodbm_changeset);
-
-#endif
+TCase *changeset_test_case();

@@ -40,6 +40,7 @@ START_TEST (test_3) {
     aodbm_list_push_back(list, (void *)10);
     aodbm_list_push_back(list, (void *)20);
     aodbm_list_push_back(list, (void *)30);
+    
     aodbm_list_iterator *it = aodbm_list_begin(list);
     fail_unless(aodbm_list_iterator_get(it) == (void *)10, NULL);
     fail_unless(aodbm_list_iterator_is_begin(it), NULL);
@@ -52,6 +53,8 @@ START_TEST (test_3) {
     fail_unless(aodbm_list_iterator_get(it) == (void *)30, NULL);
     fail_if(aodbm_list_iterator_is_begin(it), NULL);
     fail_unless(aodbm_list_iterator_is_end(it), NULL);
+    aodbm_free_list_iterator(it);
+    
     aodbm_list_pop_back(list);
     aodbm_list_pop_back(list);
     aodbm_list_pop_back(list);

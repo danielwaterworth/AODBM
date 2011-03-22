@@ -195,6 +195,10 @@ bool aodbm_list_iterator_is_end(aodbm_list_iterator *it) {
     return it->cur == it->list->tail;
 }
 
+bool aodbm_list_iterator_is_finished(aodbm_list_iterator *it) {
+    return it->cur == NULL;
+}
+
 void *aodbm_list_iterator_get(aodbm_list_iterator *it) {
     return it->cur->item;
 }
@@ -245,4 +249,8 @@ void aodbm_list_remove(aodbm_list_iterator *it) {
         }
         it->list->len -= 1;
     }
+}
+
+void aodbm_free_list_iterator(aodbm_list_iterator *it) {
+    free(it);
 }

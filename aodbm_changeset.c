@@ -27,12 +27,20 @@ static aodbm_change *create_remove_di(aodbm_data *key) {
     return c;
 }
 
+static aodbm_change *create_remove(aodbm_data *key) {
+    return create_remove_di(aodbm_data_dup(key));
+}
+
 static aodbm_change *create_modify_di(aodbm_data *key, aodbm_data *val) {
     aodbm_change *c = malloc(sizeof(aodbm_change));
     c->type = AODBM_MODIFY;
     c->key = key;
     c->val = val;
     return c;
+}
+
+static aodbm_change *create_modify(aodbm_data *key, aodbm_data *val) {
+    return create_modify_di(aodbm_data_dup(key), aodbm_data_dup(val));
 }
 
 static void free_change(aodbm_change *c) {
@@ -62,8 +70,20 @@ void aodbm_changeset_add_modify_di(aodbm_changeset changeset,
     aodbm_list_push_back(changeset.list, c);
 }
 
+void aodbm_changeset_add_modify(aodbm_changeset changeset,
+                                aodbm_data *key,
+                                aodbm_data *val) {
+    aodbm_change *c = create_modify(key, val);
+    aodbm_list_push_back(changeset.list, c);
+}
+
 void aodbm_changeset_add_remove_di(aodbm_changeset changeset, aodbm_data *key) {
     aodbm_change *c = create_remove_di(key);
+    aodbm_list_push_back(changeset.list, c);
+}
+
+void aodbm_changeset_add_remove(aodbm_changeset changeset, aodbm_data *key) {
+    aodbm_change *c = create_remove(key);
     aodbm_list_push_back(changeset.list, c);
 }
 
