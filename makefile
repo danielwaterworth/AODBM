@@ -26,7 +26,6 @@ test_srcs = c_tests/hash_test.c c_tests/data_test.c c_tests/rope_test.c \
 
 all:
 	gcc ${srcs} -c -I./ -D_GNU_SOURCE ${flags}
-	rm libaodbm.a -f
 	ar -cq libaodbm.a ${objs}
 	gcc ${objs} -shared -o libaodbm.so ${flags}
 
@@ -35,3 +34,6 @@ check: all
 	-lpthread -I./c_tests/ -I./
 	python aodbm_test.py
 	./run_c_tests
+
+clean:
+	@$(RM) *.o a.out
